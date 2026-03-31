@@ -1,0 +1,7 @@
+opencv-python>=4.10.0
+numpy>=1.26.0
+PyYAML>=6.0.1
+python-dotenv>=1.0.1
+requests>=2.31.0
+obsws-python>=1.7.0
+pytest>=8.0.0
