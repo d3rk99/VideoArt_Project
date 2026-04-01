@@ -17,6 +17,8 @@ where docker >nul 2>nul
 if errorlevel 1 goto :install_docker
 
 echo [3/4] Building container image...
+docker info >nul 2>nul
+if errorlevel 1 goto :docker_daemon_missing
 docker compose build
 if errorlevel 1 goto :fail
 
@@ -25,6 +27,13 @@ docker compose run --rm tests
 if errorlevel 1 goto :fail
 
 echo Done. Local + container checks are complete.
+set "ERR=0"
+goto :end
+
+:docker_daemon_missing
+echo [3/4] Docker is installed but daemon is not running.
+echo Start Docker Desktop (Engine running), then rerun run_all.bat for container checks.
+echo Done. Local checks are complete.
 set "ERR=0"
 goto :end
 

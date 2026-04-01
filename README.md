@@ -152,6 +152,7 @@ All `.bat` scripts pause before exiting so operators can read error output when 
 All batch scripts resolve the project root from the script location, so they can be launched from any working directory.
 `run_all.bat` performs local checks first and, if Docker is missing, attempts automatic Docker Desktop install via `winget` before asking for a rerun.
 `run_container.bat` also attempts Docker Desktop auto-install if Docker CLI is missing.
+If Docker is installed but the daemon is not running, scripts will prompt you to start Docker Desktop and rerun once the engine is active.
 
 Example:
 
