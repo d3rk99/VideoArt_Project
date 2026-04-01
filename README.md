@@ -147,6 +147,7 @@ Located in `scripts/`:
 - `run_container.bat`: starts the app service through Docker Compose.
 
 All `.bat` scripts pause before exiting so operators can read error output when launched by double-click. Pass `--no-pause` when chaining scripts.
+`setup_env.bat` auto-detects `python` first, then falls back to `py -3` on Windows.
 
 Example:
 
