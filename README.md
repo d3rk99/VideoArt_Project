@@ -136,6 +136,46 @@ Rules:
 3. Enable it in `workflows.enabled`.
 4. Ensure workflow includes nodes with `image` input and `filename_prefix` output fields for automatic injection.
 
+
+## Windows `.bat` Operator Scripts
+
+Located in `scripts/`:
+- `setup_env.bat`: creates `.venv` and installs dependencies.
+- `run_tests.bat`: runs `pytest -q` in local venv.
+- `run_app.bat`: launches the app with project config.
+- `run_all.bat`: full local+container sanity pass (setup, tests, image build, container tests).
+- `run_container.bat`: starts the app service through Docker Compose.
+
+Example:
+
+```bat
+scripts\run_all.bat
+```
+
+## Contained Environment (Docker)
+
+This project now includes `Dockerfile` and `docker-compose.yml` so checks can run in a clean isolated runtime.
+
+### Build container
+
+```bash
+docker compose build
+```
+
+### Run tests inside container
+
+```bash
+docker compose run --rm tests
+```
+
+### Start app service inside container
+
+```bash
+docker compose up --build ai-portrait-gallery
+```
+
+> Note: Direct camera access from containers depends on host OS and Docker device permissions. For gallery deployment, local host execution is typically used for camera capture while containerized checks validate reproducibility.
+
 ## Troubleshooting
 
 - **Camera unavailable**: verify index and device permissions.
