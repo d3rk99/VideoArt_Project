@@ -34,8 +34,10 @@ class GenerationService:
             raise ComfyClientError("Processed input image missing for generation")
 
         comfy_settings = settings["comfy"]
-        input_dirs = [Path(p) for p in comfy_settings.get("input_folders", [comfy_settings.get("input_dir")]) if p]
-        output_dirs = [Path(p) for p in comfy_settings.get("output_folders", []) if p]
+        input_dirs = self._coerce_folder_paths(
+            comfy_settings.get("input_folders", [comfy_settings.get("input_dir")])
+        )
+        output_dirs = self._coerce_folder_paths(comfy_settings.get("output_folders", []))
         if not input_dirs:
             raise ComfyClientError("No Comfy input folder configured (comfy.input_folders)")
         if not output_dirs:
@@ -106,6 +108,35 @@ class GenerationService:
             self.file_manager.clear_staged_comfy_inputs(input_dirs, staged_name)
 
         return latest
+
+    def _coerce_folder_paths(self, raw_paths: object) -> list[Path]:
+        if raw_paths is None:
+            return []
+        if isinstance(raw_paths, Path):
+            return [raw_paths]
+        if isinstance(raw_paths, str):
+            # Support accidental scalar values for list fields and common delimiters.
+            # This avoids iterating a string character-by-character into invalid paths
+            # like ":" on Windows.
+            separators = ["\n", ";", ","]
+            parts = [raw_paths]
+            for separator in separators:
+                expanded: list[str] = []
+                for part in parts:
+                    expanded.extend(part.split(separator))
+                parts = expanded
+            return [Path(part.strip()) for part in parts if part.strip()]
+        if isinstance(raw_paths, list):
+            paths: list[Path] = []
+            for candidate in raw_paths:
+                if not candidate:
+                    continue
+                if isinstance(candidate, Path):
+                    paths.append(candidate)
+                    continue
+                paths.append(Path(str(candidate).strip()))
+            return [p for p in paths if str(p).strip()]
+        return [Path(str(raw_paths).strip())] if str(raw_paths).strip() else []
 
     def _run_with_fallback_upload(self, workflow_payload: dict, input_path: Path, inject_input_name: bool) -> str:
         try:

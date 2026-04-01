@@ -161,3 +161,31 @@ def test_generation_service_retries_with_upload_when_comfy_cannot_read_staged_fi
     }
     outputs = service.run_for_session(session, settings)
     assert outputs[0].name == "latest_1.png"
+
+
+def test_generation_service_accepts_scalar_folder_settings(tmp_path: Path) -> None:
+    input_path = tmp_path / "session_input.jpg"
+    input_path.write_bytes(b"data")
+    output_dir = tmp_path / "comfy_output"
+    output_dir.mkdir(parents=True)
+    input_dir = tmp_path / "comfy_input"
+
+    session = SessionRecord(session_id="session_3", archive_dir=tmp_path, processed_input_path=input_path)
+    service = GenerationService(client=FakeClient(output_dir), loader=FakeLoader(), file_manager=FakeFileManager())
+    settings = {
+        "workflows": {"enabled": ["mona_lisa"], "files": {"mona_lisa": "workflows/mona_lisa.json"}},
+        "comfy": {
+            "input_folders": str(input_dir),
+            "output_folders": str(output_dir),
+            "fixed_input_filename": "input.jpg",
+            "delete_inputs_after_success": True,
+            "inject_input_filename": False,
+            "inject_output_prefix": False,
+            "output_filename_prefix_pattern": "{session_id}_{workflow}",
+            "generation_timeout_seconds": 1,
+            "poll_interval_seconds": 0.1,
+            "expected_output_count": 1,
+        },
+    }
+    outputs = service.run_for_session(session, settings)
+    assert outputs[0].name == "latest_1.png"
