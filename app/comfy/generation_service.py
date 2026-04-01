@@ -32,10 +32,12 @@ class GenerationService:
         if not input_path or not input_path.exists():
             raise ComfyClientError("Processed input image missing for generation")
 
+        uploaded_input_name = self.client.upload_input_image(input_path)
+
         loaded = self.loader.load_enabled_workflows(
             workflow_names=list(settings["workflows"]["enabled"]),
             workflow_files=dict(settings["workflows"]["files"]),
-            input_image=str(input_path),
+            input_image=uploaded_input_name,
             prefix_pattern=settings["comfy"].get("output_filename_prefix_pattern", "{session_id}_{workflow}"),
             session_id=session.session_id,
         )

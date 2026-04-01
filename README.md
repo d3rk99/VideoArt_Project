@@ -77,7 +77,8 @@ When generation starts:
 1. The app loads each workflow listed in `workflows.enabled`.
 2. It injects the captured processed image path into every node that has `inputs.image`.
 3. It injects a session/workflow prefix into every node that has `inputs.filename_prefix`.
-4. It submits each injected workflow to ComfyUI `/prompt`.
+4. It uploads the processed capture to ComfyUI (`/upload/image`) and injects the uploaded filename into image input nodes.
+5. It submits each injected workflow to ComfyUI `/prompt`.
 
 Workflow templates must contain:
 - at least one node with `inputs.image` (string value)
@@ -132,7 +133,7 @@ Manifest (`manifest.json`) includes session info plus per-workflow generation re
 ## Troubleshooting (ComfyUI)
 
 - **Healthcheck fails**: verify ComfyUI is running and `COMFYUI_BASE_URL` is reachable.
-- **Submission errors**: confirm `/prompt` endpoint is available and accepts API payloads.
+- **Submission errors (HTTP 400)**: verify workflow JSON is valid API prompt format and image nodes receive the uploaded input filename (not an invalid path).
 - **Timeout waiting for completion**: increase `generation_timeout_seconds` or inspect ComfyUI queue load.
 - **No outputs found**: check workflow output nodes and history payload content.
 - **Downloaded file errors**: verify ComfyUI `/view` endpoint can serve generated output files.
