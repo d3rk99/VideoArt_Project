@@ -40,7 +40,23 @@ class FileManager:
     def session_comfy_input_path(self, session_id: str) -> Path:
         return self.comfy_input_dir / f"{session_id}_input.jpg"
 
+    def write_workflow_outputs(self, session_id: str, workflow_name: str, outputs: list[tuple[str, bytes]]) -> list[Path]:
+        session_dir = self.output_archive_dir / session_id
+        workflow_dir = session_dir / "generated" / workflow_name
+        workflow_dir.mkdir(parents=True, exist_ok=True)
+        written: list[Path] = []
+        for idx, (filename, blob) in enumerate(outputs, start=1):
+            suffix = Path(filename).suffix or ".png"
+            target = workflow_dir / f"{workflow_name}_{idx}{suffix}"
+            target.write_bytes(blob)
+            written.append(target)
+        return written
+
     def copy_to_latest(self, source_paths: list[Path]) -> list[Path]:
+        for old_file in self.output_latest_dir.glob("*"):
+            if old_file.is_file():
+                old_file.unlink()
+
         latest_paths: list[Path] = []
         for idx, source in enumerate(source_paths, start=1):
             target = self.output_latest_dir / f"latest_{idx}{source.suffix}"

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import sys
 import time
 from pathlib import Path
 
@@ -12,6 +13,9 @@ import cv2
 from app.camera.camera_manager import CameraConfig, CameraManager
 from app.camera.capture_selector import CaptureSelector
 from app.camera.face_detector import FaceDetector
+from app.comfy.comfy_client import ComfyClient
+from app.comfy.generation_service import GenerationService
+from app.comfy.workflow_loader import WorkflowLoader
 from app.config.settings import load_settings
 from app.sessions.models import SessionState
 from app.sessions.session_manager import SessionManager
@@ -30,7 +34,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--config", default="app/config/settings.yaml")
     parser.add_argument("--manual-trigger", action="store_true", help="Trigger capture without waiting for stable face")
     parser.add_argument("--manual-reset", action="store_true", help="Reset state to IDLE and exit")
-    parser.add_argument("--test-comfy", action="store_true", help="Reserved Phase 2 healthcheck")
+    parser.add_argument("--test-comfy", action="store_true", help="Run ComfyUI connectivity + workflow parse checks")
+    parser.add_argument("--generate-latest", action="store_true", help="Generate from most recent processed input")
     parser.add_argument("--test-obs", action="store_true", help="Reserved Phase 3 healthcheck")
     return parser.parse_args()
 
@@ -97,6 +102,15 @@ def run_phase1(settings: dict) -> None:
         camera.release()
 
 
+def _build_generation_service(settings: dict, file_manager: FileManager) -> GenerationService:
+    client = ComfyClient(
+        base_url=str(settings["comfy"]["base_url"]),
+        timeout_seconds=int(settings["comfy"]["request_timeout_seconds"]),
+    )
+    loader = WorkflowLoader(Path(settings["paths"]["workflows_dir"]))
+    return GenerationService(client=client, loader=loader, file_manager=file_manager)
+
+
 def _capture_session(
     current_frame,
     camera: CameraManager,
@@ -132,9 +146,89 @@ def _capture_session(
     if session.archive_dir:
         cv2.imwrite(str(session.archive_dir / "raw_capture.jpg"), best.frame)
         cv2.imwrite(str(session.archive_dir / "processed_input.jpg"), processed)
+
+    service = _build_generation_service(settings, file_manager)
+    try:
+        machine.transition_to(SessionState.GENERATING)
+        service.run_for_session(session, settings)
+        machine.transition_to(SessionState.COLLECTING_OUTPUTS)
+        machine.transition_to(SessionState.DISPLAYING)
+        machine.transition_to(SessionState.COOLDOWN)
+    except Exception as exc:
+        LOGGER.exception("Phase 2 generation failed: %s", exc)
+        session.errors.append(str(exc))
+        machine.transition_to(SessionState.ERROR)
+        machine.transition_to(SessionState.COOLDOWN)
+    finally:
+        write_manifest(session)
+        session_manager.end_session()
+
+
+def run_test_comfy(settings: dict) -> int:
+    configure_logging(Path(settings["paths"]["logs_dir"]), bool(settings["app"]["debug"]))
+    file_manager = FileManager(
+        live_capture_dir=Path(settings["paths"]["live_capture_dir"]),
+        comfy_input_dir=Path(settings["paths"]["comfy_input_dir"]),
+        output_latest_dir=Path(settings["paths"]["output_latest_dir"]),
+        output_archive_dir=Path(settings["paths"]["output_archive_dir"]),
+    )
+    service = _build_generation_service(settings, file_manager)
+    healthy = service.client.healthcheck()
+    if not healthy:
+        print("ComfyUI connectivity test FAILED")
+        return 1
+
+    workflow_names = list(settings["workflows"]["enabled"])
+    workflow_files = dict(settings["workflows"]["files"])
+    for workflow_name in workflow_names:
+        workflow_path = service.loader.resolve_workflow_path(workflow_files[workflow_name])
+        workflow = service.loader.load(workflow_path)
+        service.loader.validate(workflow)
+    print("ComfyUI connectivity test PASSED; enabled workflow files are valid")
+    return 0
+
+
+def run_generate_latest(settings: dict) -> int:
+    configure_logging(Path(settings["paths"]["logs_dir"]), bool(settings["app"]["debug"]))
+    file_manager = FileManager(
+        live_capture_dir=Path(settings["paths"]["live_capture_dir"]),
+        comfy_input_dir=Path(settings["paths"]["comfy_input_dir"]),
+        output_latest_dir=Path(settings["paths"]["output_latest_dir"]),
+        output_archive_dir=Path(settings["paths"]["output_archive_dir"]),
+    )
+    candidates = sorted(file_manager.comfy_input_dir.glob("*_input.jpg"), key=lambda p: p.stat().st_mtime)
+    if not candidates:
+        print("No processed input image found in comfy input directory")
+        return 1
+
+    session_manager = SessionManager(file_manager)
+    machine = SessionStateMachine()
+    machine.transition_to(SessionState.DETECTING)
+    machine.transition_to(SessionState.CAPTURING)
+    machine.transition_to(SessionState.PREPARING_INPUT)
+
+    session = session_manager.start_session()
+    session.processed_input_path = candidates[-1]
+    service = _build_generation_service(settings, file_manager)
+    try:
+        machine.transition_to(SessionState.GENERATING)
+        service.run_for_session(session, settings)
+        machine.transition_to(SessionState.COLLECTING_OUTPUTS)
+        machine.transition_to(SessionState.DISPLAYING)
+        machine.transition_to(SessionState.COOLDOWN)
+    except Exception as exc:
+        session.errors.append(str(exc))
+        machine.transition_to(SessionState.ERROR)
+        machine.transition_to(SessionState.COOLDOWN)
+        write_manifest(session)
+        session_manager.end_session()
+        print(f"Generation from latest input FAILED: {exc}")
+        return 1
+
     write_manifest(session)
     session_manager.end_session()
-    machine.transition_to(SessionState.COOLDOWN)
+    print("Generation from latest input PASSED")
+    return 0
 
 
 def main() -> None:
@@ -143,6 +237,10 @@ def main() -> None:
     if args.manual_reset:
         print("Manual reset complete; state would be set to IDLE.")
         return
+    if args.test_comfy:
+        sys.exit(run_test_comfy(settings))
+    if args.generate_latest:
+        sys.exit(run_generate_latest(settings))
     run_phase1(settings)
 
 
