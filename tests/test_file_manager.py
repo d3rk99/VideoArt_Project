@@ -12,7 +12,7 @@ def test_output_path_resolution(tmp_path: Path) -> None:
     )
     session_id = "abc"
     assert fm.session_raw_path(session_id) == tmp_path / "live" / "abc_raw.jpg"
-    assert fm.session_comfy_input_path(session_id) == tmp_path / "comfy" / "abc_input.jpg"
+    assert fm.session_comfy_input_path(session_id) == tmp_path / "comfy" / "abc_input.png"
 
 
 def test_write_workflow_outputs_and_latest(tmp_path: Path) -> None:

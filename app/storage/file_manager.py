@@ -41,7 +41,7 @@ class FileManager:
         return self.live_capture_dir / f"{session_id}_raw.jpg"
 
     def session_comfy_input_path(self, session_id: str) -> Path:
-        return self.comfy_input_dir / f"{session_id}_input.jpg"
+        return self.comfy_input_dir / f"{session_id}_input.png"
 
     def stage_for_comfy_runtime(self, input_path: Path) -> str:
         if not input_path.exists():
