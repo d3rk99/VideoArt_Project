@@ -49,6 +49,7 @@ def run_phase1(settings: dict) -> None:
         comfy_input_dir=Path(settings["paths"]["comfy_input_dir"]),
         output_latest_dir=Path(settings["paths"]["output_latest_dir"]),
         output_archive_dir=Path(settings["paths"]["output_archive_dir"]),
+        comfy_runtime_input_dir=Path(settings["comfy"].get("input_dir") or settings["paths"]["comfy_input_dir"]),
     )
     session_manager = SessionManager(file_manager)
     machine = SessionStateMachine()
@@ -175,6 +176,7 @@ def run_test_comfy(settings: dict) -> int:
         comfy_input_dir=Path(settings["paths"]["comfy_input_dir"]),
         output_latest_dir=Path(settings["paths"]["output_latest_dir"]),
         output_archive_dir=Path(settings["paths"]["output_archive_dir"]),
+        comfy_runtime_input_dir=Path(settings["comfy"].get("input_dir") or settings["paths"]["comfy_input_dir"]),
     )
     try:
         service = _build_generation_service(settings, file_manager)
@@ -204,6 +206,7 @@ def run_generate_latest(settings: dict) -> int:
         comfy_input_dir=Path(settings["paths"]["comfy_input_dir"]),
         output_latest_dir=Path(settings["paths"]["output_latest_dir"]),
         output_archive_dir=Path(settings["paths"]["output_archive_dir"]),
+        comfy_runtime_input_dir=Path(settings["comfy"].get("input_dir") or settings["paths"]["comfy_input_dir"]),
     )
     candidates = sorted(file_manager.comfy_input_dir.glob("*_input.jpg"), key=lambda p: p.stat().st_mtime)
     if not candidates:

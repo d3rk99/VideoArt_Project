@@ -39,6 +39,7 @@ paths:
 
 comfy:
   base_url: ${COMFYUI_BASE_URL}
+  input_dir: ${COMFYUI_INPUT_DIR}
   request_timeout_seconds: 10
   generation_timeout_seconds: 180
   poll_interval_seconds: 2

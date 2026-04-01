@@ -76,9 +76,12 @@ COMFYUI_BASE_URL=http://127.0.0.1:8188
 
 ### `settings.yaml` keys used by Phase 2
 
+If ComfyUI runs from a different folder than this repo, set `COMFYUI_INPUT_DIR` to ComfyUI's actual `input/` directory so injected filenames resolve correctly.
+
 ```yaml
 comfy:
   base_url: ${COMFYUI_BASE_URL}
+  input_dir: ${COMFYUI_INPUT_DIR}  # optional; set to ComfyUI input folder if different
   request_timeout_seconds: 10
   generation_timeout_seconds: 180
   poll_interval_seconds: 2
