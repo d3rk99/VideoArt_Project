@@ -191,10 +191,12 @@ def run_test_comfy(settings: dict) -> int:
 
     workflow_names = list(settings["workflows"]["enabled"])
     workflow_files = dict(settings["workflows"]["files"])
+    inject_image = bool(settings["comfy"].get("inject_input_filename", False))
+    inject_prefix = bool(settings["comfy"].get("inject_output_prefix", False))
     for workflow_name in workflow_names:
         workflow_path = service.loader.resolve_workflow_path(workflow_files[workflow_name])
         workflow = service.loader.load(workflow_path)
-        service.loader.validate(workflow)
+        service.loader.validate(workflow, require_image_input=inject_image, require_output_prefix=inject_prefix)
     print("ComfyUI connectivity test PASSED; enabled workflow files are valid")
     return 0
 

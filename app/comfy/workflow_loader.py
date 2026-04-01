@@ -25,7 +25,7 @@ class WorkflowLoader:
             path = self.workflows_dir.parent / path
         return path
 
-    def validate(self, workflow: dict[str, Any]) -> None:
+    def validate(self, workflow: dict[str, Any], require_image_input: bool = True, require_output_prefix: bool = True) -> None:
         image_nodes = 0
         output_nodes = 0
         for node in workflow.values():
@@ -34,27 +34,34 @@ class WorkflowLoader:
                 image_nodes += 1
             if "filename_prefix" in inputs:
                 output_nodes += 1
-        if image_nodes == 0:
+        if require_image_input and image_nodes == 0:
             raise WorkflowValidationError("Workflow missing an image input field")
-        if output_nodes == 0:
+        if require_output_prefix and output_nodes == 0:
             raise WorkflowValidationError("Workflow missing a filename_prefix field")
 
-    def inject_io(self, workflow: dict[str, Any], input_image: str, output_prefix: str) -> dict[str, Any]:
+    def inject_io(
+        self,
+        workflow: dict[str, Any],
+        input_image: str,
+        output_prefix: str,
+        inject_image: bool = True,
+        inject_prefix: bool = True,
+    ) -> dict[str, Any]:
         updated = json.loads(json.dumps(workflow))
         image_replacements = 0
         prefix_replacements = 0
         for node in updated.values():
             inputs = node.get("inputs", {})
-            if "image" in inputs and isinstance(inputs["image"], str):
+            if inject_image and "image" in inputs and isinstance(inputs["image"], str):
                 inputs["image"] = input_image
                 image_replacements += 1
-            if "filename_prefix" in inputs:
+            if inject_prefix and "filename_prefix" in inputs:
                 inputs["filename_prefix"] = output_prefix
                 prefix_replacements += 1
 
-        if image_replacements == 0:
+        if inject_image and image_replacements == 0:
             raise WorkflowValidationError("No image inputs were injected")
-        if prefix_replacements == 0:
+        if inject_prefix and prefix_replacements == 0:
             raise WorkflowValidationError("No filename_prefix fields were injected")
         return updated
 
@@ -65,6 +72,8 @@ class WorkflowLoader:
         input_image: str,
         prefix_pattern: str,
         session_id: str,
+        inject_image: bool = True,
+        inject_prefix: bool = True,
     ) -> list[tuple[str, dict[str, Any], str]]:
         loaded: list[tuple[str, dict[str, Any], str]] = []
         for workflow_name in workflow_names:
@@ -74,8 +83,14 @@ class WorkflowLoader:
             if not workflow_path.exists():
                 raise WorkflowValidationError(f"Workflow file not found: {workflow_path}")
             workflow = self.load(workflow_path)
-            self.validate(workflow)
+            self.validate(workflow, require_image_input=inject_image, require_output_prefix=inject_prefix)
             prefix = prefix_pattern.format(session_id=session_id, workflow=workflow_name)
-            injected = self.inject_io(workflow, input_image=input_image, output_prefix=prefix)
+            injected = self.inject_io(
+                workflow,
+                input_image=input_image,
+                output_prefix=prefix,
+                inject_image=inject_image,
+                inject_prefix=inject_prefix,
+            )
             loaded.append((workflow_name, injected, prefix))
         return loaded

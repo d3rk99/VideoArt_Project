@@ -5,14 +5,13 @@ from app.sessions.models import SessionRecord
 
 
 class FakeClient:
-    def __init__(self) -> None:
-        self.uploaded_name = ""
-
-    def upload_input_image(self, local_path: Path) -> str:
-        self.uploaded_name = local_path.name
-        return local_path.name
+    def __init__(self, output_dir: Path) -> None:
+        self.output_dir = output_dir
+        self.ran = False
 
     def run_workflow(self, workflow_payload):
+        self.ran = True
+        (self.output_dir / "generated.png").write_bytes(b"img")
         return "prompt_1"
 
     def wait_for_completion(self, prompt_id: str, timeout_seconds: float, poll_interval_seconds: float):
@@ -21,36 +20,41 @@ class FakeClient:
 
         return Result()
 
-    def extract_output_paths(self, history_payload):
-        from app.comfy.comfy_client import ComfyImageRef
-
-        return [ComfyImageRef(filename="out.png", subfolder="", type="output")]
-
-    def download_output(self, image_ref):
-        return b"img"
-
-
 class FakeLoader:
     def __init__(self) -> None:
         self.injected_input = ""
 
-    def load_enabled_workflows(self, workflow_names, workflow_files, input_image, prefix_pattern, session_id):
+    def load_enabled_workflows(
+        self,
+        workflow_names,
+        workflow_files,
+        input_image,
+        prefix_pattern,
+        session_id,
+        inject_image=True,
+        inject_prefix=True,
+    ):
         self.injected_input = input_image
-        return [
-            ("mona_lisa", {"1": {"inputs": {"image": input_image}}}, "pref"),
-            ("pearl_earring", {"1": {"inputs": {"image": input_image}}}, "pref"),
-            ("girl_with_hat", {"1": {"inputs": {"image": input_image}}}, "pref"),
-            ("american_gothic", {"1": {"inputs": {"image": input_image}}}, "pref"),
-            ("pop_art_portrait", {"1": {"inputs": {"image": input_image}}}, "pref"),
-        ]
+        return [(name, {"1": {"inputs": {"image": input_image}}}, "pref") for name in workflow_names]
 
 
 class FakeFileManager:
     def __init__(self) -> None:
         self.cleared = False
+        self.deleted = False
+        self.staged_name = ""
 
-    def write_workflow_outputs(self, session_id, workflow_name, outputs):
-        return [Path(f"/tmp/{session_id}_{workflow_name}.png")]
+    def stage_for_comfy_inputs(self, input_path: Path, input_folders: list[Path], fixed_filename: str | None = None):
+        self.staged_name = fixed_filename or input_path.name
+        for folder in input_folders:
+            folder.mkdir(parents=True, exist_ok=True)
+            (folder / self.staged_name).write_bytes(input_path.read_bytes())
+        return self.staged_name
+
+    def create_session_dir(self, session_id: str) -> Path:
+        path = Path("/tmp") / session_id
+        path.mkdir(parents=True, exist_ok=True)
+        return path
 
     def copy_to_latest(self, source_paths):
         return [Path("/tmp/latest_1.png")]
@@ -58,20 +62,27 @@ class FakeFileManager:
     def clear_comfy_input_images(self):
         self.cleared = True
 
+    def clear_staged_comfy_inputs(self, input_folders: list[Path], filename: str):
+        self.deleted = True
 
-def test_generation_service_uploads_input_to_comfy_and_clears_input(tmp_path: Path) -> None:
+
+def test_generation_service_uses_folder_staging_and_clears_input_on_success(tmp_path: Path) -> None:
     input_path = tmp_path / "session_input.jpg"
     input_path.write_bytes(b"data")
+    output_dir = tmp_path / "comfy_output"
+    output_dir.mkdir(parents=True)
+    input_dir = tmp_path / "comfy_input"
+    input_dir.mkdir(parents=True)
 
     session = SessionRecord(session_id="session_1", archive_dir=tmp_path, processed_input_path=input_path)
-    client = FakeClient()
+    client = FakeClient(output_dir=output_dir)
     loader = FakeLoader()
     file_manager = FakeFileManager()
     service = GenerationService(client=client, loader=loader, file_manager=file_manager)
 
     settings = {
         "workflows": {
-            "enabled": ["mona_lisa", "pearl_earring", "girl_with_hat", "american_gothic", "pop_art_portrait"],
+            "enabled": ["mona_lisa"],
             "files": {
                 "mona_lisa": "workflows/mona_lisa.json",
                 "pearl_earring": "workflows/pearl_earring.json",
@@ -81,16 +92,24 @@ def test_generation_service_uploads_input_to_comfy_and_clears_input(tmp_path: Pa
             },
         },
         "comfy": {
+            "input_folders": [str(input_dir)],
+            "output_folders": [str(output_dir)],
+            "fixed_input_filename": "fixed_input.png",
+            "delete_inputs_after_success": True,
+            "inject_input_filename": False,
+            "inject_output_prefix": False,
             "output_filename_prefix_pattern": "{session_id}_{workflow}",
             "generation_timeout_seconds": 1,
             "poll_interval_seconds": 0.1,
-            "expected_output_count": 5,
+            "expected_output_count": 1,
         },
     }
 
     outputs = service.run_for_session(session, settings)
 
-    assert client.uploaded_name == "session_input.jpg"
-    assert loader.injected_input == "session_input.jpg"
+    assert client.ran is True
+    assert file_manager.staged_name == "fixed_input.png"
+    assert loader.injected_input == ""
     assert outputs[0].name == "latest_1.png"
     assert file_manager.cleared is True
+    assert file_manager.deleted is True

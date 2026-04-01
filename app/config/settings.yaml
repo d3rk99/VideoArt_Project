@@ -40,6 +40,14 @@ paths:
 comfy:
   base_url: http://127.0.0.1:8188
   input_dir: 'C:\Users\13der\OneDrive\Desktop\GITHUB\VideoArt_Project\input\comfy_input'
+  input_folders:
+    - 'C:\Users\13der\OneDrive\Desktop\GITHUB\VideoArt_Project\input\comfy_input'
+  output_folders:
+    - 'C:\Users\13der\OneDrive\Desktop\GITHUB\VideoArt_Project\output\comfy_output'
+  fixed_input_filename: comfy_input.png
+  delete_inputs_after_success: true
+  inject_input_filename: false
+  inject_output_prefix: false
   request_timeout_seconds: 10
   generation_timeout_seconds: 180
   poll_interval_seconds: 2
