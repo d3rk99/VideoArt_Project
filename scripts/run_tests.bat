@@ -5,8 +5,13 @@ set "SCRIPT_DIR=%~dp0"
 for %%I in ("%SCRIPT_DIR%..") do set "PROJECT_ROOT=%%~fI"
 pushd "%PROJECT_ROOT%"
 
-call scripts\setup_env.bat --no-pause
-if errorlevel 1 goto :fail
+set "SKIP_SETUP=0"
+if /I "%~1"=="--skip-setup" set "SKIP_SETUP=1"
+
+if "%SKIP_SETUP%"=="0" (
+  call scripts\setup_env.bat --no-pause
+  if errorlevel 1 goto :fail
+)
 
 call .venv\Scripts\activate
 if errorlevel 1 goto :fail

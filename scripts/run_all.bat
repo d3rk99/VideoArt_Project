@@ -10,8 +10,11 @@ call scripts\setup_env.bat --no-pause
 if errorlevel 1 goto :fail
 
 echo [2/4] Running unit tests...
-call scripts\run_tests.bat --no-pause
+call scripts\run_tests.bat --skip-setup
 if errorlevel 1 goto :fail
+
+where docker >nul 2>nul
+if errorlevel 1 goto :docker_missing
 
 echo [3/4] Building container image...
 docker compose build
@@ -22,6 +25,13 @@ docker compose run --rm tests
 if errorlevel 1 goto :fail
 
 echo Done. Local + container checks are complete.
+set "ERR=0"
+goto :end
+
+:docker_missing
+echo [3/4] Docker CLI not found. Skipping container build/test checks.
+echo Install Docker Desktop to enable contained-environment validation.
+echo Done. Local checks are complete.
 set "ERR=0"
 goto :end
 

@@ -5,10 +5,19 @@ set "SCRIPT_DIR=%~dp0"
 for %%I in ("%SCRIPT_DIR%..") do set "PROJECT_ROOT=%%~fI"
 pushd "%PROJECT_ROOT%"
 
+where docker >nul 2>nul
+if errorlevel 1 goto :docker_missing
+
 docker compose up --build ai-portrait-gallery
 if errorlevel 1 goto :fail
 
 set "ERR=0"
+goto :end
+
+:docker_missing
+echo.
+echo Docker CLI was not found. Install Docker Desktop, then rerun run_container.bat.
+set "ERR=9009"
 goto :end
 
 :fail
