@@ -14,7 +14,7 @@ call scripts\run_tests.bat --skip-setup --no-pause
 if errorlevel 1 goto :fail
 
 where docker >nul 2>nul
-if errorlevel 1 goto :docker_missing
+if errorlevel 1 goto :install_docker
 
 echo [3/4] Building container image...
 docker compose build
@@ -28,9 +28,20 @@ echo Done. Local + container checks are complete.
 set "ERR=0"
 goto :end
 
-:docker_missing
-echo [3/4] Docker CLI not found. Skipping container build/test checks.
-echo Install Docker Desktop to enable contained-environment validation.
+:install_docker
+echo [3/4] Docker CLI not found. Attempting automatic install of Docker Desktop...
+where winget >nul 2>nul
+if errorlevel 1 goto :docker_unavailable
+winget install -e --id Docker.DockerDesktop --accept-package-agreements --accept-source-agreements
+if errorlevel 1 goto :docker_unavailable
+echo Docker install command completed. Please launch Docker Desktop once if prompted, then rerun run_all.bat for container checks.
+echo Done. Local checks are complete.
+set "ERR=0"
+goto :end
+
+:docker_unavailable
+echo [3/4] Unable to install Docker automatically.
+echo Install Docker Desktop manually from https://www.docker.com/products/docker-desktop/ and rerun run_all.bat.
 echo Done. Local checks are complete.
 set "ERR=0"
 goto :end

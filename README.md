@@ -150,7 +150,8 @@ All `.bat` scripts pause before exiting so operators can read error output when 
 `setup_env.bat` verifies `python --version`, falls back to `py -3 --version`, and if both fail it attempts a `winget` install of Python 3.11 before failing with instructions.
 
 All batch scripts resolve the project root from the script location, so they can be launched from any working directory.
-`run_all.bat` performs local checks first and gracefully skips container checks when Docker is not installed.
+`run_all.bat` performs local checks first and, if Docker is missing, attempts automatic Docker Desktop install via `winget` before asking for a rerun.
+`run_container.bat` also attempts Docker Desktop auto-install if Docker CLI is missing.
 
 Example:
 
