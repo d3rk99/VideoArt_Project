@@ -21,6 +21,17 @@ class SessionState(str, Enum):
 
 
 @dataclass
+class WorkflowRunRecord:
+    workflow_name: str
+    prompt_id: str = ""
+    source_input_image: str = ""
+    generated_output_files: list[str] = field(default_factory=list)
+    started_at: str = ""
+    finished_at: str = ""
+    error: str | None = None
+
+
+@dataclass
 class SessionRecord:
     session_id: str
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
@@ -29,4 +40,5 @@ class SessionRecord:
     processed_input_path: Path | None = None
     output_paths: list[Path] = field(default_factory=list)
     workflows: list[str] = field(default_factory=list)
+    workflow_runs: list[WorkflowRunRecord] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
