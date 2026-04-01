@@ -4,12 +4,16 @@ app:
 
 camera:
   index: 0
+  backend: auto
   width: 1280
   height: 720
   fps: 30
+  buffer_size: 1
   preview_enabled: true
   reconnect_attempts: 5
   reconnect_delay_seconds: 1.5
+  reconnect_fail_threshold: 5
+  self_test_duration_seconds: 10
 
 trigger:
   minimum_face_size: 110

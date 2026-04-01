@@ -36,6 +36,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--manual-reset", action="store_true", help="Reset state to IDLE and exit")
     parser.add_argument("--test-comfy", action="store_true", help="Run ComfyUI connectivity + workflow parse checks")
     parser.add_argument("--generate-latest", action="store_true", help="Generate from most recent processed input")
+    parser.add_argument("--test-camera", action="store_true", help="Run camera self-test")
     parser.add_argument("--test-obs", action="store_true", help="Reserved Phase 3 healthcheck")
     return parser.parse_args()
 
@@ -61,6 +62,9 @@ def run_phase1(settings: dict) -> None:
         reconnect_attempts=settings["camera"]["reconnect_attempts"],
         reconnect_delay_seconds=settings["camera"]["reconnect_delay_seconds"],
         preview_enabled=settings["camera"]["preview_enabled"],
+        backend=settings["camera"].get("backend", "auto"),
+        reconnect_fail_threshold=int(settings["camera"].get("reconnect_fail_threshold", 5)),
+        buffer_size=int(settings["camera"].get("buffer_size", 1)),
     )
     camera = CameraManager(cam_cfg)
     if not camera.connect():
@@ -236,6 +240,45 @@ def run_generate_latest(settings: dict) -> int:
     return 0
 
 
+def run_test_camera(settings: dict) -> int:
+    configure_logging(Path(settings["paths"]["logs_dir"]), bool(settings["app"]["debug"]))
+    cam_cfg = CameraConfig(
+        index=settings["camera"]["index"],
+        width=settings["camera"].get("width", 1280),
+        height=settings["camera"].get("height", 720),
+        fps=settings["camera"].get("fps", 30),
+        reconnect_attempts=settings["camera"].get("reconnect_attempts", 5),
+        reconnect_delay_seconds=settings["camera"].get("reconnect_delay_seconds", 1.0),
+        preview_enabled=False,
+        backend=settings["camera"].get("backend", "auto"),
+        reconnect_fail_threshold=int(settings["camera"].get("reconnect_fail_threshold", 5)),
+        buffer_size=int(settings["camera"].get("buffer_size", 1)),
+    )
+    camera = CameraManager(cam_cfg)
+    if not camera.connect():
+        print("Camera self-test FAILED: unable to open camera")
+        return 1
+
+    duration_seconds = int(settings["camera"].get("self_test_duration_seconds", 10))
+    start = time.monotonic()
+    total_frames = 0
+    failed_reads = 0
+    try:
+        while time.monotonic() - start < duration_seconds:
+            frame = camera.read_frame()
+            if frame is None:
+                failed_reads += 1
+            else:
+                total_frames += 1
+            time.sleep(0.01)
+    finally:
+        camera.release()
+
+    status = "PASSED" if total_frames > 0 and failed_reads == 0 else "WARNING"
+    print(f"Camera self-test {status}: frames={total_frames} failed_reads={failed_reads} duration={duration_seconds}s")
+    return 0 if total_frames > 0 else 1
+
+
 def main() -> None:
     args = parse_args()
     settings = load_settings(Path(args.config))
@@ -246,6 +289,8 @@ def main() -> None:
         sys.exit(run_test_comfy(settings))
     if args.generate_latest:
         sys.exit(run_generate_latest(settings))
+    if args.test_camera:
+        sys.exit(run_test_camera(settings))
     run_phase1(settings)
 
 

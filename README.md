@@ -44,6 +44,26 @@ logs/
 tests/
 ```
 
+
+## Camera Reliability (Windows)
+
+Camera backend settings live in `app/config/settings.yaml` under `camera:`.
+
+- `backend`: `auto`, `dshow`, or `msmf`
+- `reconnect_fail_threshold`: consecutive read failures before forced reconnect
+- `reconnect_attempts` and `reconnect_delay_seconds`: reconnect policy
+- `buffer_size`: OpenCV buffer size hint (default `1`)
+
+On Windows, `backend: auto` resolves to DirectShow (`CAP_DSHOW`) for improved stability over MSMF in long-running gallery sessions.
+
+### Camera self-test
+
+```bash
+python -m app.main --config app/config/settings.yaml --test-camera
+```
+
+This runs a short capture check, reports read failures, and prints pass/fail status.
+
 ## ComfyUI Configuration (Phase 2)
 
 ### Environment variables
