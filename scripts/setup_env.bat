@@ -1,6 +1,10 @@
 @echo off
 setlocal EnableDelayedExpansion
 
+set "SCRIPT_DIR=%~dp0"
+for %%I in ("%SCRIPT_DIR%..") do set "PROJECT_ROOT=%%~fI"
+pushd "%PROJECT_ROOT%"
+
 set "PYTHON_CMD="
 call :detect_python
 if defined PYTHON_CMD goto :have_python
@@ -34,6 +38,12 @@ if errorlevel 1 goto :fail
 python -m pip install --upgrade pip
 if errorlevel 1 goto :fail
 
+if not exist requirements.txt (
+  echo requirements.txt not found at %PROJECT_ROOT%
+  set "ERR=1"
+  goto :end
+)
+
 pip install -r requirements.txt
 if errorlevel 1 goto :fail
 
@@ -65,5 +75,6 @@ echo setup_env.bat failed with errorlevel %errorlevel%.
 set "ERR=%errorlevel%"
 
 :end
+popd
 if /I not "%~1"=="--no-pause" pause
 exit /b %ERR%

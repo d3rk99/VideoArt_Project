@@ -1,6 +1,10 @@
 @echo off
 setlocal
 
+set "SCRIPT_DIR=%~dp0"
+for %%I in ("%SCRIPT_DIR%..") do set "PROJECT_ROOT=%%~fI"
+pushd "%PROJECT_ROOT%"
+
 echo [1/4] Creating Python environment and installing dependencies...
 call scripts\setup_env.bat --no-pause
 if errorlevel 1 goto :fail
@@ -18,12 +22,15 @@ docker compose run --rm tests
 if errorlevel 1 goto :fail
 
 echo Done. Local + container checks are complete.
+set "ERR=0"
 goto :end
 
 :fail
 echo.
 echo run_all.bat failed with errorlevel %errorlevel%.
+set "ERR=%errorlevel%"
 
 :end
+popd
 if /I not "%~1"=="--no-pause" pause
-exit /b %errorlevel%
+exit /b %ERR%

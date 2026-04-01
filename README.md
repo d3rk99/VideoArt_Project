@@ -149,6 +149,8 @@ Located in `scripts/`:
 All `.bat` scripts pause before exiting so operators can read error output when launched by double-click. Pass `--no-pause` when chaining scripts.
 `setup_env.bat` verifies `python --version`, falls back to `py -3 --version`, and if both fail it attempts a `winget` install of Python 3.11 before failing with instructions.
 
+All batch scripts resolve the project root from the script location, so they can be launched from any working directory.
+
 Example:
 
 ```bat

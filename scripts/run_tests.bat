@@ -1,6 +1,10 @@
 @echo off
 setlocal
 
+set "SCRIPT_DIR=%~dp0"
+for %%I in ("%SCRIPT_DIR%..") do set "PROJECT_ROOT=%%~fI"
+pushd "%PROJECT_ROOT%"
+
 call scripts\setup_env.bat --no-pause
 if errorlevel 1 goto :fail
 
@@ -11,12 +15,15 @@ pytest -q
 if errorlevel 1 goto :fail
 
 echo Tests passed.
+set "ERR=0"
 goto :end
 
 :fail
 echo.
 echo run_tests.bat failed with errorlevel %errorlevel%.
+set "ERR=%errorlevel%"
 
 :end
+popd
 if /I not "%~1"=="--no-pause" pause
-exit /b %errorlevel%
+exit /b %ERR%
