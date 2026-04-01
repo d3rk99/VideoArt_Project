@@ -94,7 +94,7 @@ def test_generation_service_uses_folder_staging_and_clears_input_on_success(tmp_
         "comfy": {
             "input_folders": [str(input_dir)],
             "output_folders": [str(output_dir)],
-            "fixed_input_filename": "fixed_input.png",
+            "fixed_input_filename": "input.jpg",
             "delete_inputs_after_success": True,
             "inject_input_filename": False,
             "inject_output_prefix": False,
@@ -108,7 +108,7 @@ def test_generation_service_uses_folder_staging_and_clears_input_on_success(tmp_
     outputs = service.run_for_session(session, settings)
 
     assert client.ran is True
-    assert file_manager.staged_name == "fixed_input.png"
+    assert file_manager.staged_name == "input.jpg"
     assert loader.injected_input == ""
     assert outputs[0].name == "latest_1.png"
     assert file_manager.cleared is True

@@ -44,7 +44,7 @@ comfy:
     - 'C:\Users\13der\OneDrive\Desktop\GITHUB\VideoArt_Project\input\comfy_input'
   output_folders:
     - 'C:\Users\13der\OneDrive\Desktop\GITHUB\VideoArt_Project\output\comfy_output'
-  fixed_input_filename: comfy_input.png
+  fixed_input_filename: input.jpg
   delete_inputs_after_success: true
   inject_input_filename: false
   inject_output_prefix: false
