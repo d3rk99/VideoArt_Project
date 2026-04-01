@@ -12,7 +12,7 @@ ALLOWED_TRANSITIONS: dict[SessionState, set[SessionState]] = {
     SessionState.IDLE: {SessionState.DETECTING, SessionState.ERROR},
     SessionState.DETECTING: {SessionState.CAPTURING, SessionState.IDLE, SessionState.ERROR},
     SessionState.CAPTURING: {SessionState.PREPARING_INPUT, SessionState.ERROR},
-    SessionState.PREPARING_INPUT: {SessionState.GENERATING, SessionState.ERROR},
+    SessionState.PREPARING_INPUT: {SessionState.GENERATING, SessionState.COOLDOWN, SessionState.ERROR},
     SessionState.GENERATING: {SessionState.COLLECTING_OUTPUTS, SessionState.ERROR},
     SessionState.COLLECTING_OUTPUTS: {SessionState.DISPLAYING, SessionState.ERROR},
     SessionState.DISPLAYING: {SessionState.COOLDOWN, SessionState.ERROR},

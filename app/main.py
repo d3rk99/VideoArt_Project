@@ -86,7 +86,6 @@ def run_phase1(settings: dict) -> None:
             if stable and machine.can_trigger_capture() and not cooldown.active() and not session_manager.has_active_session():
                 _capture_session(frame, camera, selector, session_manager, machine, file_manager, settings)
                 cooldown.start()
-                machine.transition_to(SessionState.COOLDOWN)
                 while cooldown.active():
                     time.sleep(0.1)
                 machine.transition_to(SessionState.IDLE)
@@ -135,6 +134,7 @@ def _capture_session(
         cv2.imwrite(str(session.archive_dir / "processed_input.jpg"), processed)
     write_manifest(session)
     session_manager.end_session()
+    machine.transition_to(SessionState.COOLDOWN)
 
 
 def main() -> None:
