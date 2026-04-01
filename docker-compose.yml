@@ -1,0 +1,19 @@
+services:
+  ai-portrait-gallery:
+    build: .
+    container_name: ai-portrait-gallery
+    working_dir: /app
+    env_file:
+      - .env.example
+    volumes:
+      - ./input:/app/input
+      - ./output:/app/output
+      - ./logs:/app/logs
+      - ./workflows:/app/workflows
+    command: python -m app.main --config app/config/settings.yaml --manual-reset
+
+  tests:
+    build: .
+    container_name: ai-portrait-gallery-tests
+    working_dir: /app
+    command: pytest -q
