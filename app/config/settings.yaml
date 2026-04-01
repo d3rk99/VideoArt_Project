@@ -38,7 +38,7 @@ paths:
   workflows_dir: workflows
 
 comfy:
-  base_url: ${COMFYUI_BASE_URL}
+  base_url: http://127.0.0.1:8188
   request_timeout_seconds: 10
   generation_timeout_seconds: 180
   poll_interval_seconds: 2
