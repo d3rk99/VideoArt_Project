@@ -66,7 +66,11 @@ class GenerationService:
             )
             try:
                 before_outputs = self._snapshot_outputs(output_dirs)
-                prompt_id = self.client.run_workflow(workflow_payload)
+                prompt_id = self._run_with_fallback_upload(
+                    workflow_payload=workflow_payload,
+                    input_path=input_path,
+                    inject_input_name=inject_input_name,
+                )
                 run_record.prompt_id = prompt_id
                 self.logger.info("ComfyUI prompt submitted", extra={"workflow": workflow_name, "prompt_id": prompt_id})
 
@@ -102,6 +106,24 @@ class GenerationService:
             self.file_manager.clear_staged_comfy_inputs(input_dirs, staged_name)
 
         return latest
+
+    def _run_with_fallback_upload(self, workflow_payload: dict, input_path: Path, inject_input_name: bool) -> str:
+        try:
+            return self.client.run_workflow(workflow_payload)
+        except ComfyClientError as exc:
+            message = str(exc)
+            if inject_input_name or "Invalid image file" not in message:
+                raise
+            self.logger.warning("Folder-staged input not visible to ComfyUI; retrying with upload fallback")
+            uploaded_name = self.client.upload_input_image(input_path)
+            retry_payload = self.loader.inject_io(
+                workflow_payload,
+                input_image=uploaded_name,
+                output_prefix="",
+                inject_image=True,
+                inject_prefix=False,
+            )
+            return self.client.run_workflow(retry_payload)
 
     def _snapshot_outputs(self, output_dirs: list[Path]) -> set[Path]:
         existing: set[Path] = set()
