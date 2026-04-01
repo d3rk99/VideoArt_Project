@@ -32,12 +32,10 @@ class GenerationService:
         if not input_path or not input_path.exists():
             raise ComfyClientError("Processed input image missing for generation")
 
-        uploaded_input_name = self.client.upload_input_image(input_path)
-
         loaded = self.loader.load_enabled_workflows(
             workflow_names=list(settings["workflows"]["enabled"]),
             workflow_files=dict(settings["workflows"]["files"]),
-            input_image=uploaded_input_name,
+            input_image=input_path.name,
             prefix_pattern=settings["comfy"].get("output_filename_prefix_pattern", "{session_id}_{workflow}"),
             session_id=session.session_id,
         )
@@ -81,4 +79,9 @@ class GenerationService:
         latest = self.file_manager.copy_to_latest(all_archive_outputs)
         session.output_paths = latest
         session.workflows = [workflow_name for workflow_name, _, _ in loaded]
+
+        expected_output_count = int(settings["comfy"].get("expected_output_count", 5))
+        if len(all_archive_outputs) >= expected_output_count:
+            self.file_manager.clear_comfy_input_images()
+
         return latest

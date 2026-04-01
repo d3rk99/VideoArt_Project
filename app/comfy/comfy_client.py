@@ -4,11 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
-import mimetypes
 import time
-import uuid
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -78,47 +75,6 @@ class ComfyClient:
         except (URLError, TimeoutError, json.JSONDecodeError) as exc:
             raise ComfyClientError(f"POST {path} failed: {exc}") from exc
 
-    def _post_multipart(self, path: str, fields: dict[str, str], file_field: str, file_path: Path) -> dict[str, Any]:
-        boundary = f"----ComfyBoundary{uuid.uuid4().hex}"
-        file_bytes = file_path.read_bytes()
-        mime_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
-
-        parts: list[bytes] = []
-        for key, value in fields.items():
-            parts.extend(
-                [
-                    f"--{boundary}\r\n".encode(),
-                    f'Content-Disposition: form-data; name="{key}"\r\n\r\n'.encode(),
-                    f"{value}\r\n".encode(),
-                ]
-            )
-
-        parts.extend(
-            [
-                f"--{boundary}\r\n".encode(),
-                f'Content-Disposition: form-data; name="{file_field}"; filename="{file_path.name}"\r\n'.encode(),
-                f"Content-Type: {mime_type}\r\n\r\n".encode(),
-                file_bytes,
-                b"\r\n",
-                f"--{boundary}--\r\n".encode(),
-            ]
-        )
-
-        body = b"".join(parts)
-        request = Request(
-            f"{self.base_url}{path}",
-            data=body,
-            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
-            method="POST",
-        )
-        try:
-            with urlopen(request, timeout=self.timeout_seconds) as resp:
-                return json.loads(resp.read().decode("utf-8"))
-        except HTTPError as exc:
-            raise ComfyClientError(f"POST {path} failed: {self._read_http_error(exc)}") from exc
-        except (URLError, TimeoutError, json.JSONDecodeError) as exc:
-            raise ComfyClientError(f"POST {path} failed: {exc}") from exc
-
     def _get_bytes(self, path: str, params: dict[str, str]) -> bytes:
         query = urlencode(params)
         try:
@@ -128,21 +84,6 @@ class ComfyClient:
             raise ComfyClientError(f"GET {path} failed: {self._read_http_error(exc)}") from exc
         except (URLError, TimeoutError) as exc:
             raise ComfyClientError(f"GET {path} failed: {exc}") from exc
-
-    def upload_input_image(self, image_path: Path) -> str:
-        if not image_path.exists():
-            raise ComfyClientError(f"Input image does not exist: {image_path}")
-        response = self._post_multipart(
-            path="/upload/image",
-            fields={"overwrite": "true", "type": "input"},
-            file_field="image",
-            file_path=image_path,
-        )
-        uploaded_name = str(response.get("name", "")).strip()
-        if not uploaded_name:
-            raise ComfyClientError(f"ComfyUI did not return uploaded image name for {image_path.name}")
-        self.logger.info("Uploaded Comfy input image", extra={"source": str(image_path), "uploaded_name": uploaded_name})
-        return uploaded_name
 
     def healthcheck(self) -> bool:
         self.logger.info("ComfyUI healthcheck started", extra={"base_url": self.base_url})

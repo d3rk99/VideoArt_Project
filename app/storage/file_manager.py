@@ -52,6 +52,11 @@ class FileManager:
             written.append(target)
         return written
 
+    def clear_comfy_input_images(self) -> None:
+        for candidate in self.comfy_input_dir.glob("*"):
+            if candidate.is_file():
+                candidate.unlink()
+
     def copy_to_latest(self, source_paths: list[Path]) -> list[Path]:
         for old_file in self.output_latest_dir.glob("*"):
             if old_file.is_file():

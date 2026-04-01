@@ -39,6 +39,7 @@ comfy:
   generation_timeout_seconds: 180
   poll_interval_seconds: 2
   output_filename_prefix_pattern: "{session_id}_{workflow}"
+  expected_output_count: 5
 
 obs:
   host: ${OBS_HOST}

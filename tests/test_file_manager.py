@@ -34,3 +34,21 @@ def test_write_workflow_outputs_and_latest(tmp_path: Path) -> None:
     assert outputs[0].exists()
     assert len(latest) == 2
     assert latest[0].name == "latest_1.png"
+
+
+def test_clear_comfy_input_images(tmp_path: Path) -> None:
+    fm = FileManager(
+        live_capture_dir=tmp_path / "live",
+        comfy_input_dir=tmp_path / "comfy",
+        output_latest_dir=tmp_path / "latest",
+        output_archive_dir=tmp_path / "archive",
+    )
+    a = fm.comfy_input_dir / "a.jpg"
+    b = fm.comfy_input_dir / "b.png"
+    a.write_bytes(b"x")
+    b.write_bytes(b"y")
+
+    fm.clear_comfy_input_images()
+
+    assert not a.exists()
+    assert not b.exists()
