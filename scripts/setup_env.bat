@@ -43,10 +43,10 @@ goto :end
 
 :detect_python
 set "PYTHON_CMD="
-where python >nul 2>nul
+python --version >nul 2>nul
 if %errorlevel%==0 set "PYTHON_CMD=python"
 if not defined PYTHON_CMD (
-  where py >nul 2>nul
+  py -3 --version >nul 2>nul
   if %errorlevel%==0 set "PYTHON_CMD=py -3"
 )
 exit /b 0

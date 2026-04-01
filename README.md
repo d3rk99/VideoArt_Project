@@ -147,7 +147,7 @@ Located in `scripts/`:
 - `run_container.bat`: starts the app service through Docker Compose.
 
 All `.bat` scripts pause before exiting so operators can read error output when launched by double-click. Pass `--no-pause` when chaining scripts.
-`setup_env.bat` auto-detects `python` first, falls back to `py -3`, and if both are missing it attempts a `winget` install of Python 3.11 before failing with instructions.
+`setup_env.bat` verifies `python --version`, falls back to `py -3 --version`, and if both fail it attempts a `winget` install of Python 3.11 before failing with instructions.
 
 Example:
 
