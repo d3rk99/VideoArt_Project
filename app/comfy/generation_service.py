@@ -35,7 +35,7 @@ class GenerationService:
         loaded = self.loader.load_enabled_workflows(
             workflow_names=list(settings["workflows"]["enabled"]),
             workflow_files=dict(settings["workflows"]["files"]),
-            input_image=input_path.name,
+            input_image=self.file_manager.stage_for_comfy_runtime(input_path),
             prefix_pattern=settings["comfy"].get("output_filename_prefix_pattern", "{session_id}_{workflow}"),
             session_id=session.session_id,
         )

@@ -13,11 +13,13 @@ class FileManager:
         comfy_input_dir: Path,
         output_latest_dir: Path,
         output_archive_dir: Path,
+        comfy_runtime_input_dir: Path | None = None,
     ) -> None:
         self.live_capture_dir = live_capture_dir
         self.comfy_input_dir = comfy_input_dir
         self.output_latest_dir = output_latest_dir
         self.output_archive_dir = output_archive_dir
+        self.comfy_runtime_input_dir = comfy_runtime_input_dir or comfy_input_dir
         self.ensure_dirs()
 
     def ensure_dirs(self) -> None:
@@ -26,6 +28,7 @@ class FileManager:
             self.comfy_input_dir,
             self.output_latest_dir,
             self.output_archive_dir,
+            self.comfy_runtime_input_dir,
         ]:
             folder.mkdir(parents=True, exist_ok=True)
 
@@ -40,6 +43,14 @@ class FileManager:
     def session_comfy_input_path(self, session_id: str) -> Path:
         return self.comfy_input_dir / f"{session_id}_input.jpg"
 
+    def stage_for_comfy_runtime(self, input_path: Path) -> str:
+        if not input_path.exists():
+            raise FileNotFoundError(f"Input file missing: {input_path}")
+        target = self.comfy_runtime_input_dir / input_path.name
+        if input_path.resolve() != target.resolve():
+            shutil.copy2(input_path, target)
+        return target.name
+
     def write_workflow_outputs(self, session_id: str, workflow_name: str, outputs: list[tuple[str, bytes]]) -> list[Path]:
         session_dir = self.output_archive_dir / session_id
         workflow_dir = session_dir / "generated" / workflow_name
@@ -53,9 +64,13 @@ class FileManager:
         return written
 
     def clear_comfy_input_images(self) -> None:
-        for candidate in self.comfy_input_dir.glob("*"):
-            if candidate.is_file():
-                candidate.unlink()
+        folders = [self.comfy_input_dir]
+        if self.comfy_runtime_input_dir != self.comfy_input_dir:
+            folders.append(self.comfy_runtime_input_dir)
+        for folder in folders:
+            for candidate in folder.glob("*"):
+                if candidate.is_file():
+                    candidate.unlink()
 
     def copy_to_latest(self, source_paths: list[Path]) -> list[Path]:
         for old_file in self.output_latest_dir.glob("*"):

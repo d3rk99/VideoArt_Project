@@ -52,3 +52,20 @@ def test_clear_comfy_input_images(tmp_path: Path) -> None:
 
     assert not a.exists()
     assert not b.exists()
+
+
+def test_stage_for_comfy_runtime_copies_when_dirs_differ(tmp_path: Path) -> None:
+    fm = FileManager(
+        live_capture_dir=tmp_path / "live",
+        comfy_input_dir=tmp_path / "comfy",
+        output_latest_dir=tmp_path / "latest",
+        output_archive_dir=tmp_path / "archive",
+        comfy_runtime_input_dir=tmp_path / "comfy_runtime",
+    )
+    source = fm.comfy_input_dir / "frame.jpg"
+    source.write_bytes(b"abc")
+
+    name = fm.stage_for_comfy_runtime(source)
+
+    assert name == "frame.jpg"
+    assert (fm.comfy_runtime_input_dir / "frame.jpg").exists()

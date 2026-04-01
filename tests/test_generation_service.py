@@ -41,6 +41,11 @@ class FakeLoader:
 class FakeFileManager:
     def __init__(self) -> None:
         self.cleared = False
+        self.staged = ""
+
+    def stage_for_comfy_runtime(self, input_path: Path):
+        self.staged = input_path.name
+        return input_path.name
 
     def write_workflow_outputs(self, session_id, workflow_name, outputs):
         return [Path(f"/tmp/{session_id}_{workflow_name}.png")]
@@ -83,6 +88,7 @@ def test_generation_service_uses_comfy_input_filename_and_clears_input(tmp_path:
 
     outputs = service.run_for_session(session, settings)
 
+    assert file_manager.staged == "session_input.jpg"
     assert loader.injected_input == "session_input.jpg"
     assert outputs[0].name == "latest_1.png"
     assert file_manager.cleared is True
