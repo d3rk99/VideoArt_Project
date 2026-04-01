@@ -4,12 +4,16 @@ app:
 
 camera:
   index: 0
+  backend: auto
   width: 1280
   height: 720
   fps: 30
+  buffer_size: 1
   preview_enabled: true
   reconnect_attempts: 5
   reconnect_delay_seconds: 1.5
+  reconnect_fail_threshold: 5
+  self_test_duration_seconds: 10
 
 trigger:
   minimum_face_size: 110
@@ -34,10 +38,13 @@ paths:
   workflows_dir: workflows
 
 comfy:
-  base_url: ${COMFYUI_BASE_URL}
+  base_url: http://127.0.0.1:8188
+  input_dir: 'C:\Users\13der\OneDrive\Desktop\GITHUB\VideoArt_Project\input\comfy_input'
   request_timeout_seconds: 10
   generation_timeout_seconds: 180
   poll_interval_seconds: 2
+  output_filename_prefix_pattern: "{session_id}_{workflow}"
+  expected_output_count: 5
 
 obs:
   host: ${OBS_HOST}
