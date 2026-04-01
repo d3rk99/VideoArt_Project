@@ -2,19 +2,28 @@
 setlocal
 
 echo [1/4] Creating Python environment and installing dependencies...
-call scripts\setup_env.bat
-if errorlevel 1 exit /b 1
+call scripts\setup_env.bat --no-pause
+if errorlevel 1 goto :fail
 
 echo [2/4] Running unit tests...
-call scripts\run_tests.bat
-if errorlevel 1 exit /b 1
+call scripts\run_tests.bat --no-pause
+if errorlevel 1 goto :fail
 
 echo [3/4] Building container image...
 docker compose build
-if errorlevel 1 exit /b 1
+if errorlevel 1 goto :fail
 
 echo [4/4] Running tests in container...
 docker compose run --rm tests
-if errorlevel 1 exit /b 1
+if errorlevel 1 goto :fail
 
 echo Done. Local + container checks are complete.
+goto :end
+
+:fail
+echo.
+echo run_all.bat failed with errorlevel %errorlevel%.
+
+:end
+if /I not "%~1"=="--no-pause" pause
+exit /b %errorlevel%
