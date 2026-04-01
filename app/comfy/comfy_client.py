@@ -36,6 +36,11 @@ class ComfyPromptResult:
 class ComfyClient:
     def __init__(self, base_url: str, timeout_seconds: int = 10) -> None:
         self.base_url = base_url.rstrip("/")
+        if not self.base_url.startswith(("http://", "https://")):
+            raise ComfyClientError(
+                f"Invalid ComfyUI base URL '{base_url}'. "
+                "Set COMFYUI_BASE_URL (for example: http://127.0.0.1:8188)."
+            )
         self.timeout_seconds = timeout_seconds
         self.logger = logging.getLogger(__name__)
 

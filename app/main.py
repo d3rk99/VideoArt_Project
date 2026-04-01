@@ -147,8 +147,8 @@ def _capture_session(
         cv2.imwrite(str(session.archive_dir / "raw_capture.jpg"), best.frame)
         cv2.imwrite(str(session.archive_dir / "processed_input.jpg"), processed)
 
-    service = _build_generation_service(settings, file_manager)
     try:
+        service = _build_generation_service(settings, file_manager)
         machine.transition_to(SessionState.GENERATING)
         service.run_for_session(session, settings)
         machine.transition_to(SessionState.COLLECTING_OUTPUTS)
@@ -172,7 +172,12 @@ def run_test_comfy(settings: dict) -> int:
         output_latest_dir=Path(settings["paths"]["output_latest_dir"]),
         output_archive_dir=Path(settings["paths"]["output_archive_dir"]),
     )
-    service = _build_generation_service(settings, file_manager)
+    try:
+        service = _build_generation_service(settings, file_manager)
+    except Exception as exc:
+        print(f"ComfyUI connectivity test FAILED: {exc}")
+        return 1
+
     healthy = service.client.healthcheck()
     if not healthy:
         print("ComfyUI connectivity test FAILED")
@@ -209,8 +214,8 @@ def run_generate_latest(settings: dict) -> int:
 
     session = session_manager.start_session()
     session.processed_input_path = candidates[-1]
-    service = _build_generation_service(settings, file_manager)
     try:
+        service = _build_generation_service(settings, file_manager)
         machine.transition_to(SessionState.GENERATING)
         service.run_for_session(session, settings)
         machine.transition_to(SessionState.COLLECTING_OUTPUTS)

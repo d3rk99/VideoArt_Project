@@ -1,6 +1,11 @@
 import pytest
 
-from app.comfy.comfy_client import ComfyClient, ComfyTimeoutError
+from app.comfy.comfy_client import ComfyClient, ComfyClientError, ComfyTimeoutError
+
+
+def test_invalid_base_url_raises() -> None:
+    with pytest.raises(ComfyClientError):
+        ComfyClient("")
 
 
 def test_extract_output_paths() -> None:
