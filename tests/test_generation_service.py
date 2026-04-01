@@ -5,6 +5,13 @@ from app.sessions.models import SessionRecord
 
 
 class FakeClient:
+    def __init__(self) -> None:
+        self.uploaded_name = ""
+
+    def upload_input_image(self, local_path: Path) -> str:
+        self.uploaded_name = local_path.name
+        return local_path.name
+
     def submit_workflow(self, workflow_payload):
         return "prompt_1"
 
@@ -41,11 +48,6 @@ class FakeLoader:
 class FakeFileManager:
     def __init__(self) -> None:
         self.cleared = False
-        self.staged = ""
-
-    def stage_for_comfy_runtime(self, input_path: Path):
-        self.staged = input_path.name
-        return input_path.name
 
     def write_workflow_outputs(self, session_id, workflow_name, outputs):
         return [Path(f"/tmp/{session_id}_{workflow_name}.png")]
@@ -57,7 +59,7 @@ class FakeFileManager:
         self.cleared = True
 
 
-def test_generation_service_uses_comfy_input_filename_and_clears_input(tmp_path: Path) -> None:
+def test_generation_service_uploads_input_to_comfy_and_clears_input(tmp_path: Path) -> None:
     input_path = tmp_path / "session_input.jpg"
     input_path.write_bytes(b"data")
 
@@ -88,7 +90,7 @@ def test_generation_service_uses_comfy_input_filename_and_clears_input(tmp_path:
 
     outputs = service.run_for_session(session, settings)
 
-    assert file_manager.staged == "session_input.jpg"
+    assert client.uploaded_name == "session_input.jpg"
     assert loader.injected_input == "session_input.jpg"
     assert outputs[0].name == "latest_1.png"
     assert file_manager.cleared is True

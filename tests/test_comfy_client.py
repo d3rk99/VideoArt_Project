@@ -44,3 +44,25 @@ def test_submit_workflow_returns_prompt_id(monkeypatch) -> None:
 
     monkeypatch.setattr(client, "_post_json", fake_post_json)
     assert client.submit_workflow({"1": {"inputs": {}}}) == "prompt-1"
+
+
+def test_upload_input_image_returns_uploaded_name(tmp_path, monkeypatch) -> None:
+    client = ComfyClient("http://localhost:8188")
+    image_path = tmp_path / "input.png"
+    image_path.write_bytes(b"data")
+
+    class DummyResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return b'{"name":"uploaded.png"}'
+
+    def fake_urlopen(*args, **kwargs):
+        return DummyResponse()
+
+    monkeypatch.setattr("app.comfy.comfy_client.urlopen", fake_urlopen)
+    assert client.upload_input_image(image_path) == "uploaded.png"
