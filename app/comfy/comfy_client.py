@@ -98,11 +98,23 @@ class ComfyClient:
             return False
 
     def submit_workflow(self, workflow_payload: dict[str, Any]) -> str:
-        response = self._post_json("/prompt", {"prompt": workflow_payload})
+        return self.run_workflow(workflow_payload)
+
+    def run_workflow(self, workflow_payload: dict[str, Any], client_id: str | None = None) -> str:
+        payload: dict[str, Any] = {"prompt": workflow_payload}
+        if client_id:
+            payload["client_id"] = client_id
+        try:
+            response = self._post_json("/prompt", payload)
+        except ComfyClientError as exc:
+            # Some ComfyUI deployments expose API routes under /api/*.
+            if "HTTP 404" not in str(exc):
+                raise
+            response = self._post_json("/api/prompt", payload)
         prompt_id = str(response.get("prompt_id", "")).strip()
         if not prompt_id:
             raise ComfyClientError("ComfyUI response missing prompt_id")
-        self.logger.info("Submitted workflow", extra={"prompt_id": prompt_id})
+        self.logger.info("Triggered ComfyUI run workflow", extra={"prompt_id": prompt_id})
         return prompt_id
 
     def upload_input_image(self, local_path: Path) -> str:

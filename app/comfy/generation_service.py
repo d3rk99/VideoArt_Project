@@ -47,7 +47,7 @@ class GenerationService:
                 started_at=datetime.now(timezone.utc).isoformat(),
             )
             try:
-                prompt_id = self.client.submit_workflow(workflow_payload)
+                prompt_id = self.client.run_workflow(workflow_payload)
                 run_record.prompt_id = prompt_id
                 self.logger.info("ComfyUI prompt submitted", extra={"workflow": workflow_name, "prompt_id": prompt_id})
 

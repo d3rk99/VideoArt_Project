@@ -46,6 +46,21 @@ def test_submit_workflow_returns_prompt_id(monkeypatch) -> None:
     assert client.submit_workflow({"1": {"inputs": {}}}) == "prompt-1"
 
 
+def test_run_workflow_falls_back_to_api_prefix_on_404(monkeypatch) -> None:
+    client = ComfyClient("http://localhost:8188")
+    calls: list[str] = []
+
+    def fake_post_json(path: str, payload: dict):
+        calls.append(path)
+        if path == "/prompt":
+            raise ComfyClientError("POST /prompt failed: HTTP 404: not found")
+        return {"prompt_id": "prompt-2"}
+
+    monkeypatch.setattr(client, "_post_json", fake_post_json)
+    assert client.run_workflow({"1": {"inputs": {}}}) == "prompt-2"
+    assert calls == ["/prompt", "/api/prompt"]
+
+
 def test_upload_input_image_returns_uploaded_name(tmp_path, monkeypatch) -> None:
     client = ComfyClient("http://localhost:8188")
     image_path = tmp_path / "input.png"

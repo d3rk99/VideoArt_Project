@@ -12,7 +12,7 @@ class FakeClient:
         self.uploaded_name = local_path.name
         return local_path.name
 
-    def submit_workflow(self, workflow_payload):
+    def run_workflow(self, workflow_payload):
         return "prompt_1"
 
     def wait_for_completion(self, prompt_id: str, timeout_seconds: float, poll_interval_seconds: float):
