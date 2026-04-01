@@ -10,7 +10,7 @@ call scripts\setup_env.bat --no-pause
 if errorlevel 1 goto :fail
 
 echo [2/4] Running unit tests...
-call scripts\run_tests.bat --skip-setup
+call scripts\run_tests.bat --skip-setup --no-pause
 if errorlevel 1 goto :fail
 
 where docker >nul 2>nul

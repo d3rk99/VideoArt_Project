@@ -6,7 +6,14 @@ for %%I in ("%SCRIPT_DIR%..") do set "PROJECT_ROOT=%%~fI"
 pushd "%PROJECT_ROOT%"
 
 set "SKIP_SETUP=0"
+set "NO_PAUSE=0"
+:parse_args
+if "%~1"=="" goto :after_args
 if /I "%~1"=="--skip-setup" set "SKIP_SETUP=1"
+if /I "%~1"=="--no-pause" set "NO_PAUSE=1"
+shift
+goto :parse_args
+:after_args
 
 if "%SKIP_SETUP%"=="0" (
   call scripts\setup_env.bat --no-pause
@@ -30,5 +37,5 @@ set "ERR=%errorlevel%"
 
 :end
 popd
-if /I not "%~1"=="--no-pause" pause
+if "%NO_PAUSE%"=="0" pause
 exit /b %ERR%
