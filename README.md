@@ -52,6 +52,7 @@ VideoArt_Project/
    copy config.example.yaml config.yaml
    ```
 3. Update values in `config.yaml` (see **Required Customization** below).
+- Windows path tip: in YAML, prefer forward slashes (`C:/...`) or single-quoted backslash paths (`'C:\\...'`). Avoid double-quoted unescaped backslashes like `"C:\something"` because YAML treats backslashes as escapes.
 
 ## Run
 

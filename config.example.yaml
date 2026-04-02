@@ -10,6 +10,7 @@ camera:
   capture_cooldown_seconds: 8
 
 folders:
+  # NOTE (Windows YAML): prefer forward slashes like C:/path or single-quoted backslash paths.
   capture_input_dir: "C:/comfyui/input/faces"
   comfy_output_dir: "C:/comfyui/output/installation"
   archive_dir: "./data/archive"

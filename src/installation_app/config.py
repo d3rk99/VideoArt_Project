@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from yaml import YAMLError
 
 
 @dataclass(frozen=True)
@@ -161,8 +162,16 @@ def load_config(config_path: Path) -> Config:
     if not config_path.exists():
         raise ConfigError(f"Config file not found: {config_path}")
 
-    with config_path.open("r", encoding="utf-8") as f:
-        raw = yaml.safe_load(f) or {}
+    try:
+        with config_path.open("r", encoding="utf-8") as f:
+            raw = yaml.safe_load(f) or {}
+    except YAMLError as exc:
+        raise ConfigError(
+            "Invalid YAML in config file. On Windows, avoid double-quoted paths with backslashes "
+            "(e.g. 'C:/path/to/dir' or 'C:\\\\path\\\\to\\\\dir') unless escaped; "
+            "prefer forward slashes or single-quoted backslash paths. "
+            f"Original parser error: {exc}"
+        ) from exc
 
     config = _parse_config(raw)
     config.folders.capture_input_dir.mkdir(parents=True, exist_ok=True)
