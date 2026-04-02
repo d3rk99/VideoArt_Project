@@ -94,6 +94,9 @@ Set in `comfyui.workflow_file`.
 Set in `folders.capture_input_dir` and `folders.comfy_output_dir`.
 
 - `capture_input_dir`: where this app writes captured faces.
+- `capture_input_filename`: filename written into the input directory (default `input_face.jpg`).
+  - This is critical: many ComfyUI `LoadImage` nodes are configured for a fixed filename.
+  - If your workflow expects fixed input, keep this fixed and **do not** use `{run_id}`.
 - `comfy_output_dir`: where ComfyUI writes generated output images.
 
 ### 3) OBS source names

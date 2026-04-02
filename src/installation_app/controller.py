@@ -188,7 +188,8 @@ class PipelineController:
         self.state = AppState.SAVING
         self._status_message = "Saving capture"
 
-        filename = f"{run_id}_face.jpg"
+        filename_template = self.config.folders.capture_input_filename
+        filename = filename_template.replace("{run_id}", run_id)
         target = self.config.folders.capture_input_dir / filename
         ok = cv2.imwrite(str(target), frame)
         if not ok:

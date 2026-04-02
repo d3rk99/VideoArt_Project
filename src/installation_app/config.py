@@ -30,6 +30,7 @@ class CameraConfig:
 @dataclass(frozen=True)
 class FolderConfig:
     capture_input_dir: Path
+    capture_input_filename: str
     comfy_output_dir: Path
     archive_dir: Path
 
@@ -129,6 +130,7 @@ def _parse_config(raw: dict[str, Any]) -> Config:
 
     folders = FolderConfig(
         capture_input_dir=Path(_require(folders_raw, "capture_input_dir", "folders")).expanduser(),
+        capture_input_filename=str(folders_raw.get("capture_input_filename", "input_face.jpg")),
         comfy_output_dir=Path(_require(folders_raw, "comfy_output_dir", "folders")).expanduser(),
         archive_dir=Path(_require(folders_raw, "archive_dir", "folders")).expanduser(),
     )

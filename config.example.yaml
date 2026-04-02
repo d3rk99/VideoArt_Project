@@ -18,6 +18,9 @@ camera:
 folders:
   # NOTE (Windows YAML): prefer forward slashes like C:/path or single-quoted backslash paths.
   capture_input_dir: "C:/comfyui/input/faces"
+  # IMPORTANT: most ComfyUI LoadImage nodes expect a specific filename.
+  # Use a fixed filename unless your workflow is explicitly designed for dynamic names.
+  capture_input_filename: "input_face.jpg" # supports {run_id} placeholder if needed
   comfy_output_dir: "C:/comfyui/output/installation"
   archive_dir: "./data/archive"
 
