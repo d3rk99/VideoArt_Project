@@ -169,7 +169,8 @@ This project uses **per-run file manifests** (stored in memory via `RunContext`)
 - App snapshots output folder before trigger.
 - After run completion, app collects only newly appeared output files.
 - OBS updates image sources and triggers transition.
-- App waits `cleanup.output_cleanup_delay_ms` to allow OBS refresh, then deletes only run output files.
+- App defers deleting current run outputs until after a *later* successful run has loaded replacement images into OBS.
+- After replacement is confirmed, app waits `cleanup.output_cleanup_delay_ms` and deletes only the prior run's output files.
 
 ### Safety controls
 - Retry delete operations using:
@@ -204,7 +205,7 @@ To avoid exposing new images on Program too early, the app uses this sequence:
 3. Set staging scene to **Preview**.
 4. Trigger configured transition (Preview → Program).
 5. Wait `transition_duration_ms + post_transition_delay_ms`.
-6. Delete generated output files.
+6. Delete previous run output files (current run files are retained until next replacement).
 
 This ensures cleanup only happens after transition completion/safety delay.
 

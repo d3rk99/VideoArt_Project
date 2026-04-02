@@ -38,6 +38,7 @@ class PipelineController:
         self._status_message = "Waiting for face"
         self._comfy_backoff_until = 0.0
         self._comfy_failure_count = 0
+        self._pending_output_cleanup: list[Path] = []
 
     def run(self) -> None:
         self._initialize()
@@ -211,12 +212,20 @@ class PipelineController:
                 time.sleep(transition_wait)
 
             if self.config.cleanup.cleanup_output_after_obs:
+                # Keep the current run's files available until the next successful run replaces them in OBS.
+                # This avoids deleting files that OBS is still displaying when there is no replacement yet.
                 self.state = AppState.CLEANING_OUTPUTS
-                self._status_message = "Cleaning output files"
-                self.cleanup.delete_files(
-                    run.output_files,
-                    delay_ms=self.config.cleanup.output_cleanup_delay_ms,
-                    label="output",
+                self._status_message = "Cleaning previous output files"
+                if self._pending_output_cleanup:
+                    self.cleanup.delete_files(
+                        self._pending_output_cleanup,
+                        delay_ms=self.config.cleanup.output_cleanup_delay_ms,
+                        label="output_previous_run",
+                    )
+                self._pending_output_cleanup = list(run.output_files)
+                self.logger.info(
+                    "Deferred cleanup armed with %s files from current run",
+                    len(self._pending_output_cleanup),
                 )
 
             self.state = AppState.READY
