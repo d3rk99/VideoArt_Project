@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
+from requests import HTTPError
 
 from installation_app.config import ComfyUIConfig
 
@@ -34,7 +35,15 @@ class ComfyUIClient:
         payload["client_id"] = client_id
 
         resp = self.session.post(f"{self.config.server_url}/prompt", json=payload, timeout=10)
-        resp.raise_for_status()
+        try:
+            resp.raise_for_status()
+        except HTTPError as exc:
+            body = resp.text.strip()
+            detail = body[:400] if body else "<empty response>"
+            raise RuntimeError(
+                f"ComfyUI /prompt failed with HTTP {resp.status_code}. "
+                f"Response: {detail}"
+            ) from exc
         data = resp.json()
         prompt_id = data.get("prompt_id")
         if not prompt_id:

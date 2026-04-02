@@ -72,11 +72,16 @@ class PipelineController:
                     self._status_message = "Cooldown active"
                 elif should_capture or manual_capture:
                     try:
+                        # Start cooldown immediately to avoid rapid re-trigger loops on downstream failures.
+                        self._last_capture_time = time.monotonic()
                         self._run_pipeline(frame)
                     except Exception as exc:  # pylint: disable=broad-except
-                        self.logger.exception("Pipeline run failed: %s", exc)
+                        if self.config.app.debug_logging:
+                            self.logger.exception("Pipeline run failed: %s", exc)
+                        else:
+                            self.logger.error("Pipeline run failed: %s", exc)
                         self.state = AppState.READY
-                        self._status_message = "Recovered from error; ready"
+                        self._status_message = "Run failed; cooldown active"
                         time.sleep(self.config.app.idle_reset_seconds)
                         self.state = AppState.DETECTING
                         self._status_message = "Waiting for face"
@@ -112,60 +117,63 @@ class PipelineController:
         self._status_message = "Capturing face"
         input_file = self._save_capture(frame, run.run_id)
         run.input_files.append(input_file)
+        try:
+            output_baseline = self.output_watcher.snapshot()
 
-        output_baseline = self.output_watcher.snapshot()
+            self.state = AppState.TRIGGERING_COMFY
+            self._status_message = "Triggering ComfyUI"
+            run.comfy_prompt_id = self.comfy.queue_prompt(client_id=str(uuid.uuid4()))
+            self.logger.info("Queued ComfyUI prompt_id=%s", run.comfy_prompt_id)
 
-        self.state = AppState.TRIGGERING_COMFY
-        self._status_message = "Triggering ComfyUI"
-        run.comfy_prompt_id = self.comfy.queue_prompt(client_id=str(uuid.uuid4()))
-        self.logger.info("Queued ComfyUI prompt_id=%s", run.comfy_prompt_id)
+            self.state = AppState.WAITING_FOR_COMFY
+            self._status_message = "Generating images"
+            _ = self.comfy.wait_for_completion(run.comfy_prompt_id)
+            self.logger.info("ComfyUI run complete prompt_id=%s", run.comfy_prompt_id)
 
-        self.state = AppState.WAITING_FOR_COMFY
-        self._status_message = "Generating images"
-        _ = self.comfy.wait_for_completion(run.comfy_prompt_id)
-        self.logger.info("ComfyUI run complete prompt_id=%s", run.comfy_prompt_id)
+            if self.config.cleanup.cleanup_input_after_comfy:
+                self.state = AppState.CLEANING_INPUTS
+                self._status_message = "Cleaning input files"
+                self.cleanup.delete_files(
+                    run.input_files,
+                    delay_ms=self.config.cleanup.input_cleanup_delay_ms,
+                    label="input",
+                )
 
-        if self.config.cleanup.cleanup_input_after_comfy:
-            self.state = AppState.CLEANING_INPUTS
-            self._status_message = "Cleaning input files"
-            self.cleanup.delete_files(
-                run.input_files,
-                delay_ms=self.config.cleanup.input_cleanup_delay_ms,
-                label="input",
+            self.state = AppState.COLLECTING_OUTPUTS
+            self._status_message = "Collecting output files"
+            run.output_files = self.output_watcher.wait_for_new_files(
+                baseline=output_baseline,
+                timeout_seconds=self.config.comfyui.completion_timeout_seconds,
+                poll_interval_seconds=self.config.comfyui.poll_interval_seconds,
             )
+            self.logger.info("Detected output files: %s", [str(p) for p in run.output_files])
 
-        self.state = AppState.COLLECTING_OUTPUTS
-        self._status_message = "Collecting output files"
-        run.output_files = self.output_watcher.wait_for_new_files(
-            baseline=output_baseline,
-            timeout_seconds=self.config.comfyui.completion_timeout_seconds,
-            poll_interval_seconds=self.config.comfyui.poll_interval_seconds,
-        )
-        self.logger.info("Detected output files: %s", [str(p) for p in run.output_files])
+            if self.config.obs.enabled:
+                self.state = AppState.UPDATING_OBS
+                self._status_message = "Updating OBS sources"
+                self.obs.update_image_sources(run.output_files)
 
-        if self.config.obs.enabled:
-            self.state = AppState.UPDATING_OBS
-            self._status_message = "Updating OBS sources"
-            self.obs.update_image_sources(run.output_files)
+                self.state = AppState.TRIGGERING_TRANSITION
+                self._status_message = "Triggering transition"
+                self.obs.trigger_transition()
 
-            self.state = AppState.TRIGGERING_TRANSITION
-            self._status_message = "Triggering transition"
-            self.obs.trigger_transition()
+            if self.config.cleanup.cleanup_output_after_obs:
+                self.state = AppState.CLEANING_OUTPUTS
+                self._status_message = "Cleaning output files"
+                self.cleanup.delete_files(
+                    run.output_files,
+                    delay_ms=self.config.cleanup.output_cleanup_delay_ms,
+                    label="output",
+                )
 
-        if self.config.cleanup.cleanup_output_after_obs:
-            self.state = AppState.CLEANING_OUTPUTS
-            self._status_message = "Cleaning output files"
-            self.cleanup.delete_files(
-                run.output_files,
-                delay_ms=self.config.cleanup.output_cleanup_delay_ms,
-                label="output",
-            )
-
-        self._last_capture_time = time.monotonic()
-        self.state = AppState.READY
-        self._status_message = "Ready for next participant"
-        time.sleep(self.config.app.idle_reset_seconds)
-        self.state = AppState.DETECTING
+            self.state = AppState.READY
+            self._status_message = "Ready for next participant"
+            time.sleep(self.config.app.idle_reset_seconds)
+            self.state = AppState.DETECTING
+        except Exception:
+            # If Comfy trigger/generation fails, do not leave orphaned inputs from this run.
+            self.cleanup.delete_files(run.input_files, delay_ms=0, label="input_failed_run")
+            raise
 
     def _save_capture(self, frame, run_id: str) -> Path:
         self.state = AppState.SAVING

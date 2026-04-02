@@ -178,3 +178,9 @@ This project uses **per-run file manifests** (stored in memory via `RunContext`)
 - On reconnect, the app advances to the next backend candidate (on Windows: `dshow` → `msmf` → `auto`) to recover from backend-specific failures.
 - If a camera opens but only returns dark/black frames, the app treats this as a read failure after a threshold and automatically cycles camera/backend candidates.
 - If you see backend-specific OpenCV warnings, switch `camera.backend` between `dshow` and `msmf`.
+
+## ComfyUI Failure Behavior
+
+- If ComfyUI returns an error when queueing `/prompt`, the app now logs a concise HTTP+response summary.
+- The app enters cooldown (using capture cooldown timing) before another trigger attempt, avoiding rapid-fire request spam.
+- Any input image captured for the failed run is cleaned up immediately so failed attempts do not accumulate files.
