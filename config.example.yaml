@@ -1,0 +1,50 @@
+camera:
+  primary_index: 0
+  indices: [0]
+  frame_width: 1280
+  frame_height: 720
+  preview_enabled: true
+  scan_max_index: 6
+  face_stability_seconds: 1.5
+  min_face_area_ratio: 0.05
+  capture_cooldown_seconds: 8
+
+folders:
+  capture_input_dir: "C:/comfyui/input/faces"
+  comfy_output_dir: "C:/comfyui/output/installation"
+  archive_dir: "./data/archive"
+
+comfyui:
+  server_url: "http://127.0.0.1:8188"
+  workflow_file: "./workflows/installation_prompt.json"
+  poll_interval_seconds: 1.0
+  completion_timeout_seconds: 180
+
+obs:
+  enabled: true
+  host: "127.0.0.1"
+  port: 4455
+  password: "REPLACE_ME"
+  target_scene: "MainScene"
+  transition_name: "Fade"
+  transition_duration_ms: 400
+  image_sources:
+    - "GeneratedImageA"
+    - "GeneratedImageB"
+
+cleanup:
+  cleanup_input_after_comfy: true
+  cleanup_output_after_obs: true
+  input_cleanup_delay_ms: 250
+  output_cleanup_delay_ms: 800
+  cleanup_retry_count: 4
+  cleanup_retry_delay_ms: 300
+  allow_full_folder_cleanup: false
+
+app:
+  debug_logging: false
+  auto_cleanup_old_files: false
+  manual_override_key: "c"
+  quit_key: "q"
+  idle_reset_seconds: 1.0
+  allow_concurrent_jobs: false
