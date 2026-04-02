@@ -83,6 +83,7 @@ class AppConfig:
     manual_override_key: str
     quit_key: str
     idle_reset_seconds: float
+    post_cycle_detection_delay_ms: int
     allow_concurrent_jobs: bool
     comfy_error_backoff_seconds: float
     comfy_error_backoff_max_seconds: float
@@ -193,6 +194,7 @@ def _parse_config(raw: dict[str, Any]) -> Config:
         manual_override_key=str(_require(app_raw, "manual_override_key", "app")),
         quit_key=str(_require(app_raw, "quit_key", "app")),
         idle_reset_seconds=float(_require(app_raw, "idle_reset_seconds", "app")),
+        post_cycle_detection_delay_ms=int(app_raw.get("post_cycle_detection_delay_ms", 1000)),
         allow_concurrent_jobs=bool(_require(app_raw, "allow_concurrent_jobs", "app")),
         comfy_error_backoff_seconds=float(app_raw.get("comfy_error_backoff_seconds", 15.0)),
         comfy_error_backoff_max_seconds=float(app_raw.get("comfy_error_backoff_max_seconds", 300.0)),

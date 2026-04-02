@@ -70,6 +70,7 @@ app:
   manual_override_key: "c"
   quit_key: "q"
   idle_reset_seconds: 1.0
+  post_cycle_detection_delay_ms: 1000
   allow_concurrent_jobs: false
   comfy_error_backoff_seconds: 15.0
   comfy_error_backoff_max_seconds: 300.0

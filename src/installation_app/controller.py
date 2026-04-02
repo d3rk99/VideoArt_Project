@@ -232,7 +232,9 @@ class PipelineController:
             self._status_message = "Ready for next participant"
             self._comfy_failure_count = 0
             self._comfy_backoff_until = 0.0
-            time.sleep(self.config.app.idle_reset_seconds)
+            post_cycle_delay_ms = self.config.app.post_cycle_detection_delay_ms
+            self.logger.info("Post-cycle detection delay: %sms", post_cycle_delay_ms)
+            time.sleep(post_cycle_delay_ms / 1000)
             self.state = AppState.DETECTING
         except Exception:
             # If Comfy trigger/generation fails, do not leave orphaned inputs from this run.
