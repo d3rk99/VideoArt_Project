@@ -31,6 +31,7 @@ class PipelineController:
         self._last_capture_time = 0.0
         self._status_message = "Waiting for face"
         self._comfy_backoff_until = 0.0
+        self._comfy_failure_count = 0
 
     def run(self) -> None:
         self._initialize()
@@ -174,6 +175,8 @@ class PipelineController:
 
             self.state = AppState.READY
             self._status_message = "Ready for next participant"
+            self._comfy_failure_count = 0
+            self._comfy_backoff_until = 0.0
             time.sleep(self.config.app.idle_reset_seconds)
             self.state = AppState.DETECTING
         except Exception:
@@ -204,10 +207,15 @@ class PipelineController:
     def _register_pipeline_failure(self, exc: Exception) -> None:
         message = str(exc)
         if "ComfyUI /prompt failed" in message or "ComfyUI run timed out" in message:
-            self._comfy_backoff_until = time.monotonic() + self.config.app.comfy_error_backoff_seconds
+            self._comfy_failure_count += 1
+            base = self.config.app.comfy_error_backoff_seconds
+            max_backoff = self.config.app.comfy_error_backoff_max_seconds
+            backoff_seconds = min(max_backoff, base * (2 ** (self._comfy_failure_count - 1)))
+            self._comfy_backoff_until = time.monotonic() + backoff_seconds
             self.logger.warning(
-                "Applying ComfyUI backoff for %.1fs after failure",
-                self.config.app.comfy_error_backoff_seconds,
+                "Applying ComfyUI backoff for %.1fs after failure (failure count=%s)",
+                backoff_seconds,
+                self._comfy_failure_count,
             )
 
     def _render_preview(self, frame, face_status: FaceStatus) -> None:

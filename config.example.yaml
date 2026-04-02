@@ -56,3 +56,4 @@ app:
   idle_reset_seconds: 1.0
   allow_concurrent_jobs: false
   comfy_error_backoff_seconds: 15.0
+  comfy_error_backoff_max_seconds: 300.0

@@ -183,5 +183,8 @@ This project uses **per-run file manifests** (stored in memory via `RunContext`)
 
 - If ComfyUI returns an error when queueing `/prompt`, the app now logs a concise HTTP+response summary.
 - The app enters cooldown (using capture cooldown timing) before another trigger attempt, avoiding rapid-fire request spam.
-- A dedicated Comfy backoff window (`app.comfy_error_backoff_seconds`) is applied after Comfy failures to avoid hammering the server when it is unhealthy.
+- A dedicated Comfy backoff window is applied after Comfy failures to avoid hammering the server when it is unhealthy.
+  - Base: `app.comfy_error_backoff_seconds`
+  - Max cap: `app.comfy_error_backoff_max_seconds`
+  - Backoff increases exponentially with repeated failures and resets after a successful run.
 - Any input image captured for the failed run is cleaned up immediately so failed attempts do not accumulate files.
