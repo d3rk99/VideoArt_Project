@@ -30,6 +30,7 @@ class PipelineController:
 
         self._last_capture_time = 0.0
         self._status_message = "Waiting for face"
+        self._comfy_backoff_until = 0.0
 
     def run(self) -> None:
         self._initialize()
@@ -70,6 +71,10 @@ class PipelineController:
                 if self._cooldown_active():
                     self.state = AppState.COOLDOWN
                     self._status_message = "Cooldown active"
+                elif self._comfy_backoff_active():
+                    self.state = AppState.COOLDOWN
+                    remaining = max(0.0, self._comfy_backoff_until - time.monotonic())
+                    self._status_message = f"ComfyUI backoff active ({remaining:.1f}s)"
                 elif should_capture or manual_capture:
                     try:
                         # Start cooldown immediately to avoid rapid re-trigger loops on downstream failures.
@@ -80,6 +85,7 @@ class PipelineController:
                             self.logger.exception("Pipeline run failed: %s", exc)
                         else:
                             self.logger.error("Pipeline run failed: %s", exc)
+                        self._register_pipeline_failure(exc)
                         self.state = AppState.READY
                         self._status_message = "Run failed; cooldown active"
                         time.sleep(self.config.app.idle_reset_seconds)
@@ -191,6 +197,18 @@ class PipelineController:
     def _cooldown_active(self) -> bool:
         elapsed = time.monotonic() - self._last_capture_time
         return elapsed < self.config.camera.capture_cooldown_seconds
+
+    def _comfy_backoff_active(self) -> bool:
+        return time.monotonic() < self._comfy_backoff_until
+
+    def _register_pipeline_failure(self, exc: Exception) -> None:
+        message = str(exc)
+        if "ComfyUI /prompt failed" in message or "ComfyUI run timed out" in message:
+            self._comfy_backoff_until = time.monotonic() + self.config.app.comfy_error_backoff_seconds
+            self.logger.warning(
+                "Applying ComfyUI backoff for %.1fs after failure",
+                self.config.app.comfy_error_backoff_seconds,
+            )
 
     def _render_preview(self, frame, face_status: FaceStatus) -> None:
         if not self.config.camera.preview_enabled:

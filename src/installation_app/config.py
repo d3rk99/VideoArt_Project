@@ -73,6 +73,7 @@ class AppConfig:
     quit_key: str
     idle_reset_seconds: float
     allow_concurrent_jobs: bool
+    comfy_error_backoff_seconds: float
 
 
 @dataclass(frozen=True)
@@ -166,6 +167,7 @@ def _parse_config(raw: dict[str, Any]) -> Config:
         quit_key=str(_require(app_raw, "quit_key", "app")),
         idle_reset_seconds=float(_require(app_raw, "idle_reset_seconds", "app")),
         allow_concurrent_jobs=bool(_require(app_raw, "allow_concurrent_jobs", "app")),
+        comfy_error_backoff_seconds=float(app_raw.get("comfy_error_backoff_seconds", 15.0)),
     )
 
     if not comfy.workflow_file.exists():
