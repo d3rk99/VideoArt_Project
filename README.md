@@ -59,6 +59,10 @@ VideoArt_Project/
 run.bat
 ```
 
+## Batch Script Crash Visibility
+
+Both `install.bat` and `run.bat` now pause on errors so the terminal stays open and operator-visible crash messages can be read before closing the window.
+
 ## Connectivity Tests
 
 Use these before live operation:
