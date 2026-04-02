@@ -46,6 +46,7 @@ class ComfyUIConfig:
     page_load_timeout_ms: int
     ui_trigger_delay_ms: int
     ui_trigger_retry_count: int
+    ui_click_fallback_enabled: bool
     poll_interval_seconds: float
     completion_timeout_seconds: float
 
@@ -151,7 +152,8 @@ def _parse_config(raw: dict[str, Any]) -> Config:
         playwright_browser=str(comfy_raw.get("playwright_browser", "chromium")).lower(),
         page_load_timeout_ms=int(comfy_raw.get("page_load_timeout_ms", 15000)),
         ui_trigger_delay_ms=int(comfy_raw.get("ui_trigger_delay_ms", 700)),
-        ui_trigger_retry_count=int(comfy_raw.get("ui_trigger_retry_count", 2)),
+        ui_trigger_retry_count=int(comfy_raw.get("ui_trigger_retry_count", 0)),
+        ui_click_fallback_enabled=bool(comfy_raw.get("ui_click_fallback_enabled", False)),
         poll_interval_seconds=float(_require(comfy_raw, "poll_interval_seconds", "comfyui")),
         completion_timeout_seconds=float(_require(comfy_raw, "completion_timeout_seconds", "comfyui")),
     )

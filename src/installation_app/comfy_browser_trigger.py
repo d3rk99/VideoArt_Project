@@ -59,7 +59,7 @@ class ComfyUIBrowserTrigger:
                     exc,
                 )
 
-                if self._try_click_fallback():
+                if self.config.ui_click_fallback_enabled and self._try_click_fallback():
                     self.logger.info("Triggered ComfyUI queue via button-click fallback")
                     return
 

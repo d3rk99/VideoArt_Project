@@ -32,7 +32,8 @@ comfyui:
   playwright_browser: "chromium" # chromium | firefox | webkit
   page_load_timeout_ms: 15000
   ui_trigger_delay_ms: 700
-  ui_trigger_retry_count: 2
+  ui_trigger_retry_count: 0
+  ui_click_fallback_enabled: false
   workflow_file: "./workflows/installation_prompt.json"
   poll_interval_seconds: 1.0
   completion_timeout_seconds: 180
@@ -48,6 +49,9 @@ obs:
   image_sources:
     - "GeneratedImageA"
     - "GeneratedImageB"
+    - "GeneratedImageC"
+    - "GeneratedImageD"
+    - "GeneratedImageE"
 
 cleanup:
   cleanup_input_after_comfy: true

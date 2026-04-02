@@ -101,6 +101,9 @@ Set in `comfyui.trigger_mode`:
 - Requires the correct workflow to already be loaded in the visible ComfyUI editor tab.
 - Designed for debug/demo use and is more fragile than API mode.
 - Uses Ctrl+Enter first, with a minimal Queue/Run button-click fallback.
+- To reduce accidental double-triggering, default config uses:
+  - `ui_trigger_retry_count: 0`
+  - `ui_click_fallback_enabled: false`
 
 ### 2) ComfyUI input/output folders
 Set in `folders.capture_input_dir` and `folders.comfy_output_dir`.
@@ -116,6 +119,7 @@ Set in `obs.image_sources`.
 
 - Must match existing OBS image source names exactly.
 - If multiple sources are configured but fewer images are generated, the last image is reused.
+- Example config includes five sources (`GeneratedImageA` ... `GeneratedImageE`) for A-E output layouts.
 
 ### 4) Camera device index
 Set in `camera.primary_index`.
