@@ -110,6 +110,7 @@ Set in `camera.primary_index`.
   - `camera.backend`: `dshow` (recommended), `msmf`, or `auto`
   - `camera.read_retry_count` and `camera.read_retry_delay_ms`
   - `camera.reconnect_on_read_failure` to auto-reopen camera if frame grabbing fails
+  - `camera.black_frame_luma_threshold` and `camera.black_frame_max_consecutive` to detect/recover from black-screen camera feeds
 
 ## Pipeline State Machine
 
@@ -175,4 +176,5 @@ This project uses **per-run file manifests** (stored in memory via `RunContext`)
 - Transient camera read errors are retried and no longer crash the full app loop.
 - If enabled, camera reconnect is attempted automatically on read failures.
 - On reconnect, the app advances to the next backend candidate (on Windows: `dshow` → `msmf` → `auto`) to recover from backend-specific failures.
+- If a camera opens but only returns dark/black frames, the app treats this as a read failure after a threshold and automatically cycles camera/backend candidates.
 - If you see backend-specific OpenCV warnings, switch `camera.backend` between `dshow` and `msmf`.

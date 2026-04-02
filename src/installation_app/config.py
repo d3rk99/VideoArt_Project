@@ -23,6 +23,8 @@ class CameraConfig:
     read_retry_count: int
     read_retry_delay_ms: int
     reconnect_on_read_failure: bool
+    black_frame_luma_threshold: float
+    black_frame_max_consecutive: int
 
 
 @dataclass(frozen=True)
@@ -115,9 +117,13 @@ def _parse_config(raw: dict[str, Any]) -> Config:
         read_retry_count=int(camera_raw.get("read_retry_count", 3)),
         read_retry_delay_ms=int(camera_raw.get("read_retry_delay_ms", 120)),
         reconnect_on_read_failure=bool(camera_raw.get("reconnect_on_read_failure", True)),
+        black_frame_luma_threshold=float(camera_raw.get("black_frame_luma_threshold", 8.0)),
+        black_frame_max_consecutive=int(camera_raw.get("black_frame_max_consecutive", 10)),
     )
     if camera.backend not in {"auto", "dshow", "msmf"}:
         raise ConfigError("camera.backend must be one of: auto, dshow, msmf")
+    if camera.black_frame_max_consecutive < 1:
+        raise ConfigError("camera.black_frame_max_consecutive must be >= 1")
 
     folders = FolderConfig(
         capture_input_dir=Path(_require(folders_raw, "capture_input_dir", "folders")).expanduser(),

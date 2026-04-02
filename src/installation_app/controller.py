@@ -45,7 +45,8 @@ class PipelineController:
                         try:
                             self.webcam.reopen(advance_backend=True)
                             self.logger.info(
-                                "Camera reopened after read failure using backend %s",
+                                "Camera reopened after read failure using camera %s backend %s",
+                                self.webcam.current_camera_index(),
                                 self.webcam.current_backend_name(),
                             )
                         except Exception as reopen_exc:  # pylint: disable=broad-except
@@ -91,7 +92,7 @@ class PipelineController:
         self.webcam.open()
         self.logger.info(
             "Opened camera index %s with backend %s",
-            self.config.camera.primary_index,
+            self.webcam.current_camera_index(),
             self.webcam.current_backend_name(),
         )
 

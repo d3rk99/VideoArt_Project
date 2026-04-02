@@ -12,6 +12,8 @@ camera:
   read_retry_count: 3
   read_retry_delay_ms: 120
   reconnect_on_read_failure: true
+  black_frame_luma_threshold: 8.0
+  black_frame_max_consecutive: 10
 
 folders:
   # NOTE (Windows YAML): prefer forward slashes like C:/path or single-quoted backslash paths.

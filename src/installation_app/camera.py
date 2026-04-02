@@ -24,9 +24,23 @@ class WebcamManager:
         self.cap: cv2.VideoCapture | None = None
         self._backend_candidates = self._build_backend_candidates()
         self._backend_index = 0
+        self._camera_candidates = self._build_camera_candidates()
+        self._camera_index = 0
+        self._black_frame_count = 0
 
     def _resolve_backend(self) -> int:
         return self._backend_candidates[self._backend_index]
+
+    def _resolve_camera(self) -> int:
+        return self._camera_candidates[self._camera_index]
+
+    def _build_camera_candidates(self) -> list[int]:
+        indices = [self.config.primary_index, *self.config.indices]
+        dedup: list[int] = []
+        for idx in indices:
+            if idx not in dedup:
+                dedup.append(idx)
+        return dedup or [self.config.primary_index]
 
     def _build_backend_candidates(self) -> list[int]:
         backend = self.config.backend.lower()
@@ -68,19 +82,23 @@ class WebcamManager:
 
     def open(self) -> None:
         open_errors: list[str] = []
-        for idx, backend in enumerate(self._backend_candidates):
-            self._backend_index = idx
-            self.cap = cv2.VideoCapture(self.config.primary_index, backend)
-            if self.cap is not None and self.cap.isOpened():
-                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.config.frame_width)
-                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.config.frame_height)
-                return
-            open_errors.append(self._backend_name(backend))
-            if self.cap:
-                self.cap.release()
-                self.cap = None
+        for cam_idx, cam in enumerate(self._camera_candidates):
+            self._camera_index = cam_idx
+            for be_idx, backend in enumerate(self._backend_candidates):
+                self._backend_index = be_idx
+                self.cap = cv2.VideoCapture(cam, backend)
+                if self.cap is not None and self.cap.isOpened():
+                    self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.config.frame_width)
+                    self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.config.frame_height)
+                    self._black_frame_count = 0
+                    return
+                open_errors.append(f"camera={cam}, backend={self._backend_name(backend)}")
+                if self.cap:
+                    self.cap.release()
+                    self.cap = None
         raise RuntimeError(
-            f"Unable to open camera index {self.config.primary_index}. Tried backends: {open_errors}"
+            "Unable to open any configured camera/backend combination. "
+            f"Tried: {open_errors}"
         )
 
     def read(self) -> np.ndarray:
@@ -89,6 +107,13 @@ class WebcamManager:
         for _ in range(self.config.read_retry_count + 1):
             ok, frame = self.cap.read()
             if ok:
+                if self._is_black_frame(frame):
+                    self._black_frame_count += 1
+                    if self._black_frame_count >= self.config.black_frame_max_consecutive:
+                        raise RuntimeError("Received consecutive black frames from camera")
+                    time.sleep(self.config.read_retry_delay_ms / 1000)
+                    continue
+                self._black_frame_count = 0
                 return frame
             time.sleep(self.config.read_retry_delay_ms / 1000)
         raise RuntimeError("Failed to read frame from camera")
@@ -96,16 +121,27 @@ class WebcamManager:
     def reopen(self, advance_backend: bool = False) -> None:
         self.close()
         if advance_backend and len(self._backend_candidates) > 1:
+            prev = self._backend_index
             self._backend_index = (self._backend_index + 1) % len(self._backend_candidates)
+            if self._backend_index <= prev and len(self._camera_candidates) > 1:
+                self._camera_index = (self._camera_index + 1) % len(self._camera_candidates)
         self.open()
 
     def current_backend_name(self) -> str:
         return self._backend_name(self._resolve_backend())
 
+    def current_camera_index(self) -> int:
+        return self._resolve_camera()
+
     def close(self) -> None:
         if self.cap:
             self.cap.release()
             self.cap = None
+
+    def _is_black_frame(self, frame: np.ndarray) -> bool:
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        mean_luma = float(gray.mean())
+        return mean_luma <= self.config.black_frame_luma_threshold
 
 
 class FaceDetector:
