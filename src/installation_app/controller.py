@@ -3,6 +3,8 @@ from __future__ import annotations
 import time
 import uuid
 from pathlib import Path
+from threading import Thread
+import traceback
 
 import cv2
 
@@ -39,12 +41,16 @@ class PipelineController:
         self._comfy_backoff_until = 0.0
         self._comfy_failure_count = 0
         self._pending_output_cleanup: list[Path] = []
+        self._pipeline_thread: Thread | None = None
+        self._pipeline_error: Exception | None = None
+        self._pipeline_error_traceback: str | None = None
 
     def run(self) -> None:
         self._initialize()
         try:
             self.state = AppState.DETECTING
             while True:
+                self._poll_pipeline_completion()
                 try:
                     frame = self.webcam.read()
                 except Exception as exc:  # pylint: disable=broad-except
@@ -69,14 +75,21 @@ class PipelineController:
                     self.logger.info("Quit key pressed, exiting.")
                     break
 
-                should_capture = self.detector.should_capture(face_status)
-                manual_capture = self.detector.key_pressed(key_code, self.config.app.manual_override_key)
+                pipeline_active = self._pipeline_active()
+                should_capture = self.detector.should_capture(face_status) if not pipeline_active else False
+                manual_capture = (
+                    self.detector.key_pressed(key_code, self.config.app.manual_override_key)
+                    if not pipeline_active
+                    else False
+                )
 
-                if face_status.detected and not should_capture:
+                if face_status.detected and not should_capture and not pipeline_active:
                     self.state = AppState.FACE_LOCKED
                     self._status_message = "Face locked"
 
-                if self._cooldown_active():
+                if pipeline_active:
+                    self._status_message = "Run in progress"
+                elif self._cooldown_active():
                     self.state = AppState.COOLDOWN
                     self._status_message = "Cooldown active"
                 elif self._comfy_backoff_active():
@@ -87,18 +100,9 @@ class PipelineController:
                     try:
                         # Start cooldown immediately to avoid rapid re-trigger loops on downstream failures.
                         self._last_capture_time = time.monotonic()
-                        self._run_pipeline(frame)
+                        self._start_pipeline(frame.copy())
                     except Exception as exc:  # pylint: disable=broad-except
-                        if self.config.app.debug_logging:
-                            self.logger.exception("Pipeline run failed: %s", exc)
-                        else:
-                            self.logger.error("Pipeline run failed: %s", exc)
-                        self._register_pipeline_failure(exc)
-                        self.state = AppState.READY
-                        self._status_message = "Run failed; cooldown active"
-                        time.sleep(self.config.app.idle_reset_seconds)
-                        self.state = AppState.DETECTING
-                        self._status_message = "Waiting for face"
+                        self._handle_pipeline_failure(exc)
 
                 self._render_preview(frame, face_status)
         finally:
@@ -241,6 +245,46 @@ class PipelineController:
             self.cleanup.delete_files(run.input_files, delay_ms=0, label="input_failed_run")
             raise
 
+    def _start_pipeline(self, frame) -> None:
+        if self._pipeline_active():
+            return
+        self._pipeline_error = None
+        self._pipeline_error_traceback = None
+        self._pipeline_thread = Thread(target=self._run_pipeline_thread, args=(frame,), daemon=True)
+        self._pipeline_thread.start()
+
+    def _run_pipeline_thread(self, frame) -> None:
+        try:
+            self._run_pipeline(frame)
+        except Exception as exc:  # pylint: disable=broad-except
+            self._pipeline_error = exc
+            self._pipeline_error_traceback = traceback.format_exc()
+
+    def _pipeline_active(self) -> bool:
+        return self._pipeline_thread is not None and self._pipeline_thread.is_alive()
+
+    def _poll_pipeline_completion(self) -> None:
+        if self._pipeline_thread and not self._pipeline_thread.is_alive():
+            self._pipeline_thread.join()
+            self._pipeline_thread = None
+            if self._pipeline_error:
+                exc = self._pipeline_error
+                self._pipeline_error = None
+                self._handle_pipeline_failure(exc, self._pipeline_error_traceback)
+                self._pipeline_error_traceback = None
+
+    def _handle_pipeline_failure(self, exc: Exception, trace: str | None = None) -> None:
+        if self.config.app.debug_logging and trace:
+            self.logger.error("Pipeline run failed: %s\n%s", exc, trace)
+        else:
+            self.logger.error("Pipeline run failed: %s", exc)
+        self._register_pipeline_failure(exc)
+        self.state = AppState.READY
+        self._status_message = "Run failed; cooldown active"
+        time.sleep(self.config.app.idle_reset_seconds)
+        self.state = AppState.DETECTING
+        self._status_message = "Waiting for face"
+
     def _save_capture(self, frame, run_id: str) -> Path:
         self.state = AppState.SAVING
         self._status_message = "Saving capture"
@@ -292,6 +336,8 @@ class PipelineController:
         cv2.imshow("Installation Preview", annotated)
 
     def shutdown(self) -> None:
+        if self._pipeline_thread:
+            self._pipeline_thread.join(timeout=1.0)
         self.webcam.close()
         self.comfy.shutdown()
         if self.comfy_browser:
