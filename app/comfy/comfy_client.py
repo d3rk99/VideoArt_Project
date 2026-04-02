@@ -6,6 +6,8 @@ import json
 import logging
 import time
 from dataclasses import dataclass
+from pathlib import Path
+from uuid import uuid4
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -96,12 +98,60 @@ class ComfyClient:
             return False
 
     def submit_workflow(self, workflow_payload: dict[str, Any]) -> str:
-        response = self._post_json("/prompt", {"prompt": workflow_payload})
+        return self.run_workflow(workflow_payload)
+
+    def run_workflow(self, workflow_payload: dict[str, Any], client_id: str | None = None) -> str:
+        payload: dict[str, Any] = {"prompt": workflow_payload}
+        if client_id:
+            payload["client_id"] = client_id
+        try:
+            response = self._post_json("/prompt", payload)
+        except ComfyClientError as exc:
+            # Some ComfyUI deployments expose API routes under /api/*.
+            if "HTTP 404" not in str(exc):
+                raise
+            response = self._post_json("/api/prompt", payload)
         prompt_id = str(response.get("prompt_id", "")).strip()
         if not prompt_id:
             raise ComfyClientError("ComfyUI response missing prompt_id")
-        self.logger.info("Submitted workflow", extra={"prompt_id": prompt_id})
+        self.logger.info("Triggered ComfyUI run workflow", extra={"prompt_id": prompt_id})
         return prompt_id
+
+    def upload_input_image(self, local_path: Path) -> str:
+        if not local_path.exists():
+            raise ComfyClientError(f"Input file missing: {local_path}")
+        boundary = f"----comfyupload{uuid4().hex}"
+        image_bytes = local_path.read_bytes()
+        parts = [
+            f"--{boundary}\r\n".encode("utf-8"),
+            (
+                'Content-Disposition: form-data; name="image"; '
+                f'filename="{local_path.name}"\r\n'
+            ).encode("utf-8"),
+            b"Content-Type: application/octet-stream\r\n\r\n",
+            image_bytes,
+            b"\r\n",
+            f"--{boundary}--\r\n".encode("utf-8"),
+        ]
+        body = b"".join(parts)
+        request = Request(
+            f"{self.base_url}/upload/image",
+            data=body,
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+            method="POST",
+        )
+        try:
+            with urlopen(request, timeout=self.timeout_seconds) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+        except HTTPError as exc:
+            raise ComfyClientError(f"POST /upload/image failed: {self._read_http_error(exc)}") from exc
+        except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+            raise ComfyClientError(f"POST /upload/image failed: {exc}") from exc
+
+        uploaded_name = str(payload.get("name", "")).strip()
+        if not uploaded_name:
+            raise ComfyClientError("POST /upload/image response missing uploaded filename")
+        return uploaded_name
 
     def get_history(self, prompt_id: str) -> dict[str, Any]:
         return self._get_json(f"/history/{prompt_id}")

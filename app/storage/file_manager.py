@@ -51,6 +51,26 @@ class FileManager:
             shutil.copy2(input_path, target)
         return target.name
 
+    def stage_for_comfy_inputs(
+        self,
+        input_path: Path,
+        input_folders: list[Path],
+        fixed_filename: str | None = None,
+    ) -> str:
+        if not input_path.exists():
+            raise FileNotFoundError(f"Input file missing: {input_path}")
+        target_name = fixed_filename or input_path.name
+        for folder in input_folders:
+            folder.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(input_path, folder / target_name)
+        return target_name
+
+    def clear_staged_comfy_inputs(self, input_folders: list[Path], filename: str) -> None:
+        for folder in input_folders:
+            candidate = folder / filename
+            if candidate.exists() and candidate.is_file():
+                candidate.unlink()
+
     def write_workflow_outputs(self, session_id: str, workflow_name: str, outputs: list[tuple[str, bytes]]) -> list[Path]:
         session_dir = self.output_archive_dir / session_id
         workflow_dir = session_dir / "generated" / workflow_name

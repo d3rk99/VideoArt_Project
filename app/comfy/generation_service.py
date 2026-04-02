@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -32,12 +33,31 @@ class GenerationService:
         if not input_path or not input_path.exists():
             raise ComfyClientError("Processed input image missing for generation")
 
+        comfy_settings = settings["comfy"]
+        input_dirs = self._coerce_folder_paths(
+            comfy_settings.get("input_folders", [comfy_settings.get("input_dir")])
+        )
+        output_dirs = self._coerce_folder_paths(comfy_settings.get("output_folders", []))
+        if not input_dirs:
+            raise ComfyClientError("No Comfy input folder configured (comfy.input_folders)")
+        if not output_dirs:
+            raise ComfyClientError("No Comfy output folder configured (comfy.output_folders)")
+
+        staged_name = self.file_manager.stage_for_comfy_inputs(
+            input_path=input_path,
+            input_folders=input_dirs,
+            fixed_filename=comfy_settings.get("fixed_input_filename"),
+        )
+
+        inject_input_name = bool(comfy_settings.get("inject_input_filename", False))
         loaded = self.loader.load_enabled_workflows(
             workflow_names=list(settings["workflows"]["enabled"]),
             workflow_files=dict(settings["workflows"]["files"]),
-            input_image=self.file_manager.stage_for_comfy_runtime(input_path),
+            input_image=staged_name if inject_input_name else "",
             prefix_pattern=settings["comfy"].get("output_filename_prefix_pattern", "{session_id}_{workflow}"),
             session_id=session.session_id,
+            inject_image=inject_input_name,
+            inject_prefix=bool(comfy_settings.get("inject_output_prefix", False)),
         )
         all_archive_outputs: list[Path] = []
         for workflow_name, workflow_payload, _ in loaded:
@@ -47,24 +67,25 @@ class GenerationService:
                 started_at=datetime.now(timezone.utc).isoformat(),
             )
             try:
-                prompt_id = self.client.submit_workflow(workflow_payload)
+                before_outputs = self._snapshot_outputs(output_dirs)
+                prompt_id = self._run_with_fallback_upload(
+                    workflow_payload=workflow_payload,
+                    input_path=input_path,
+                    inject_input_name=inject_input_name,
+                )
                 run_record.prompt_id = prompt_id
                 self.logger.info("ComfyUI prompt submitted", extra={"workflow": workflow_name, "prompt_id": prompt_id})
 
-                result = self.client.wait_for_completion(
+                self.client.wait_for_completion(
                     prompt_id=prompt_id,
                     timeout_seconds=float(settings["comfy"]["generation_timeout_seconds"]),
                     poll_interval_seconds=float(settings["comfy"]["poll_interval_seconds"]),
                 )
-                image_refs = self.client.extract_output_paths(result.history_payload)
-                if not image_refs:
-                    raise ComfyClientError(f"No output images found for workflow {workflow_name}")
+                discovered = self._detect_new_outputs(output_dirs, before_outputs)
+                if not discovered:
+                    raise ComfyClientError(f"No output images detected in configured output folders for {workflow_name}")
 
-                archive_outputs = self.file_manager.write_workflow_outputs(
-                    session_id=session.session_id,
-                    workflow_name=workflow_name,
-                    outputs=[(img.filename, self.client.download_output(img)) for img in image_refs],
-                )
+                archive_outputs = self._archive_detected_outputs(session.session_id, workflow_name, discovered)
                 run_record.generated_output_files = [str(p) for p in archive_outputs]
                 all_archive_outputs.extend(archive_outputs)
             except Exception as exc:
@@ -83,5 +104,85 @@ class GenerationService:
         expected_output_count = int(settings["comfy"].get("expected_output_count", 5))
         if len(all_archive_outputs) >= expected_output_count:
             self.file_manager.clear_comfy_input_images()
+        if bool(comfy_settings.get("delete_inputs_after_success", True)):
+            self.file_manager.clear_staged_comfy_inputs(input_dirs, staged_name)
 
         return latest
+
+    def _coerce_folder_paths(self, raw_paths: object) -> list[Path]:
+        if raw_paths is None:
+            return []
+        if isinstance(raw_paths, Path):
+            return [raw_paths]
+        if isinstance(raw_paths, str):
+            # Support accidental scalar values for list fields and common delimiters.
+            # This avoids iterating a string character-by-character into invalid paths
+            # like ":" on Windows.
+            separators = ["\n", ";", ","]
+            parts = [raw_paths]
+            for separator in separators:
+                expanded: list[str] = []
+                for part in parts:
+                    expanded.extend(part.split(separator))
+                parts = expanded
+            return [Path(part.strip()) for part in parts if part.strip()]
+        if isinstance(raw_paths, list):
+            paths: list[Path] = []
+            for candidate in raw_paths:
+                if not candidate:
+                    continue
+                if isinstance(candidate, Path):
+                    paths.append(candidate)
+                    continue
+                paths.append(Path(str(candidate).strip()))
+            return [p for p in paths if str(p).strip()]
+        return [Path(str(raw_paths).strip())] if str(raw_paths).strip() else []
+
+    def _run_with_fallback_upload(self, workflow_payload: dict, input_path: Path, inject_input_name: bool) -> str:
+        try:
+            return self.client.run_workflow(workflow_payload)
+        except ComfyClientError as exc:
+            message = str(exc)
+            if inject_input_name or "Invalid image file" not in message:
+                raise
+            self.logger.warning("Folder-staged input not visible to ComfyUI; retrying with upload fallback")
+            uploaded_name = self.client.upload_input_image(input_path)
+            retry_payload = self.loader.inject_io(
+                workflow_payload,
+                input_image=uploaded_name,
+                output_prefix="",
+                inject_image=True,
+                inject_prefix=False,
+            )
+            return self.client.run_workflow(retry_payload)
+
+    def _snapshot_outputs(self, output_dirs: list[Path]) -> set[Path]:
+        existing: set[Path] = set()
+        for folder in output_dirs:
+            folder.mkdir(parents=True, exist_ok=True)
+            existing.update(p.resolve() for p in folder.glob("*") if p.is_file())
+        return existing
+
+    def _detect_new_outputs(self, output_dirs: list[Path], before_outputs: set[Path]) -> list[Path]:
+        discovered: list[Path] = []
+        for folder in output_dirs:
+            for candidate in sorted(folder.glob("*")):
+                if not candidate.is_file():
+                    continue
+                resolved = candidate.resolve()
+                if resolved in before_outputs:
+                    continue
+                discovered.append(candidate)
+        return discovered
+
+    def _archive_detected_outputs(self, session_id: str, workflow_name: str, outputs: list[Path]) -> list[Path]:
+        session_dir = self.file_manager.create_session_dir(session_id)
+        workflow_dir = session_dir / "generated" / workflow_name
+        workflow_dir.mkdir(parents=True, exist_ok=True)
+        archived: list[Path] = []
+        for idx, source in enumerate(outputs, start=1):
+            suffix = source.suffix or ".png"
+            target = workflow_dir / f"{workflow_name}_{idx}{suffix}"
+            shutil.copy2(source, target)
+            archived.append(target)
+        return archived
