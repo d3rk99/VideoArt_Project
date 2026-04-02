@@ -8,6 +8,10 @@ camera:
   face_stability_seconds: 1.5
   min_face_area_ratio: 0.05
   capture_cooldown_seconds: 8
+  backend: "dshow" # auto|dshow|msmf ; dshow is usually quieter on Windows
+  read_retry_count: 3
+  read_retry_delay_ms: 120
+  reconnect_on_read_failure: true
 
 folders:
   # NOTE (Windows YAML): prefer forward slashes like C:/path or single-quoted backslash paths.

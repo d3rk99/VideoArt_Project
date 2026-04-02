@@ -19,6 +19,10 @@ class CameraConfig:
     face_stability_seconds: float
     min_face_area_ratio: float
     capture_cooldown_seconds: float
+    backend: str
+    read_retry_count: int
+    read_retry_delay_ms: int
+    reconnect_on_read_failure: bool
 
 
 @dataclass(frozen=True)
@@ -107,7 +111,13 @@ def _parse_config(raw: dict[str, Any]) -> Config:
         face_stability_seconds=float(_require(camera_raw, "face_stability_seconds", "camera")),
         min_face_area_ratio=float(_require(camera_raw, "min_face_area_ratio", "camera")),
         capture_cooldown_seconds=float(_require(camera_raw, "capture_cooldown_seconds", "camera")),
+        backend=str(camera_raw.get("backend", "auto")).lower(),
+        read_retry_count=int(camera_raw.get("read_retry_count", 3)),
+        read_retry_delay_ms=int(camera_raw.get("read_retry_delay_ms", 120)),
+        reconnect_on_read_failure=bool(camera_raw.get("reconnect_on_read_failure", True)),
     )
+    if camera.backend not in {"auto", "dshow", "msmf"}:
+        raise ConfigError("camera.backend must be one of: auto, dshow, msmf")
 
     folders = FolderConfig(
         capture_input_dir=Path(_require(folders_raw, "capture_input_dir", "folders")).expanduser(),

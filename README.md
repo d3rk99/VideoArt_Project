@@ -106,6 +106,10 @@ Set in `obs.image_sources`.
 Set in `camera.primary_index`.
 
 - Use camera scan logs at startup to identify available indices.
+- For Windows capture stability/noise, you can set:
+  - `camera.backend`: `dshow` (recommended), `msmf`, or `auto`
+  - `camera.read_retry_count` and `camera.read_retry_delay_ms`
+  - `camera.reconnect_on_read_failure` to auto-reopen camera if frame grabbing fails
 
 ## Pipeline State Machine
 
@@ -165,3 +169,9 @@ This project uses **per-run file manifests** (stored in memory via `RunContext`)
 - Multi-camera architecture is prepared (camera scanning + configurable indices), but first pass runs a single primary stream.
 - Face detector currently uses OpenCV Haar cascade for reliability and minimal dependencies.
 - Designed for sequential single-job flow unless explicitly changed in config.
+
+## Camera Failure Recovery Notes
+
+- Transient camera read errors are retried and no longer crash the full app loop.
+- If enabled, camera reconnect is attempted automatically on read failures.
+- If you see backend-specific OpenCV warnings, switch `camera.backend` between `dshow` and `msmf`.

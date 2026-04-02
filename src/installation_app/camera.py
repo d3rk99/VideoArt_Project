@@ -22,17 +22,27 @@ class WebcamManager:
         self.config = config
         self.cap: cv2.VideoCapture | None = None
 
+    def _resolve_backend(self) -> int:
+        backend = self.config.backend.lower()
+        if backend == "dshow" and hasattr(cv2, "CAP_DSHOW"):
+            return cv2.CAP_DSHOW
+        if backend == "msmf" and hasattr(cv2, "CAP_MSMF"):
+            return cv2.CAP_MSMF
+        return cv2.CAP_ANY
+
     def scan_available_cameras(self) -> list[int]:
         available: list[int] = []
-        for index in range(self.config.scan_max_index + 1):
-            cap = cv2.VideoCapture(index)
+        probe_indices = self.config.indices or list(range(self.config.scan_max_index + 1))
+        backend = self._resolve_backend()
+        for index in probe_indices:
+            cap = cv2.VideoCapture(index, backend)
             if cap is not None and cap.isOpened():
                 available.append(index)
                 cap.release()
         return available
 
     def open(self) -> None:
-        self.cap = cv2.VideoCapture(self.config.primary_index)
+        self.cap = cv2.VideoCapture(self.config.primary_index, self._resolve_backend())
         if self.cap is None or not self.cap.isOpened():
             raise RuntimeError(f"Unable to open camera index {self.config.primary_index}")
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.config.frame_width)
@@ -41,10 +51,16 @@ class WebcamManager:
     def read(self) -> np.ndarray:
         if not self.cap:
             raise RuntimeError("Camera is not open")
-        ok, frame = self.cap.read()
-        if not ok:
-            raise RuntimeError("Failed to read frame from camera")
-        return frame
+        for _ in range(self.config.read_retry_count + 1):
+            ok, frame = self.cap.read()
+            if ok:
+                return frame
+            time.sleep(self.config.read_retry_delay_ms / 1000)
+        raise RuntimeError("Failed to read frame from camera")
+
+    def reopen(self) -> None:
+        self.close()
+        self.open()
 
     def close(self) -> None:
         if self.cap:

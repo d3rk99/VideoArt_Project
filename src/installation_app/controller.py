@@ -36,7 +36,19 @@ class PipelineController:
         try:
             self.state = AppState.DETECTING
             while True:
-                frame = self.webcam.read()
+                try:
+                    frame = self.webcam.read()
+                except Exception as exc:  # pylint: disable=broad-except
+                    self.logger.warning("Camera read failed: %s", exc)
+                    self._status_message = "Camera read failed; retrying"
+                    if self.config.camera.reconnect_on_read_failure:
+                        try:
+                            self.webcam.reopen()
+                            self.logger.info("Camera reopened after read failure")
+                        except Exception as reopen_exc:  # pylint: disable=broad-except
+                            self.logger.error("Camera reopen failed: %s", reopen_exc)
+                    time.sleep(self.config.app.idle_reset_seconds)
+                    continue
                 face_status = self.detector.evaluate(frame)
 
                 key_code = cv2.waitKey(1) & 0xFF if self.config.camera.preview_enabled else -1
