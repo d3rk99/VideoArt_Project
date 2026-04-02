@@ -39,6 +39,13 @@ class FolderConfig:
 class ComfyUIConfig:
     server_url: str
     workflow_file: Path
+    trigger_mode: str
+    browser_url: str
+    playwright_headless: bool
+    playwright_browser: str
+    page_load_timeout_ms: int
+    ui_trigger_delay_ms: int
+    ui_trigger_retry_count: int
     poll_interval_seconds: float
     completion_timeout_seconds: float
 
@@ -138,9 +145,20 @@ def _parse_config(raw: dict[str, Any]) -> Config:
     comfy = ComfyUIConfig(
         server_url=str(_require(comfy_raw, "server_url", "comfyui")).rstrip("/"),
         workflow_file=Path(_require(comfy_raw, "workflow_file", "comfyui")).expanduser(),
+        trigger_mode=str(comfy_raw.get("trigger_mode", "api")).lower(),
+        browser_url=str(comfy_raw.get("browser_url", _require(comfy_raw, "server_url", "comfyui"))),
+        playwright_headless=bool(comfy_raw.get("playwright_headless", False)),
+        playwright_browser=str(comfy_raw.get("playwright_browser", "chromium")).lower(),
+        page_load_timeout_ms=int(comfy_raw.get("page_load_timeout_ms", 15000)),
+        ui_trigger_delay_ms=int(comfy_raw.get("ui_trigger_delay_ms", 700)),
+        ui_trigger_retry_count=int(comfy_raw.get("ui_trigger_retry_count", 2)),
         poll_interval_seconds=float(_require(comfy_raw, "poll_interval_seconds", "comfyui")),
         completion_timeout_seconds=float(_require(comfy_raw, "completion_timeout_seconds", "comfyui")),
     )
+    if comfy.trigger_mode not in {"api", "browser_ui"}:
+        raise ConfigError("comfyui.trigger_mode must be one of: api, browser_ui")
+    if comfy.playwright_browser not in {"chromium", "firefox", "webkit"}:
+        raise ConfigError("comfyui.playwright_browser must be one of: chromium, firefox, webkit")
 
     obs = OBSConfig(
         enabled=bool(_require(obs_raw, "enabled", "obs")),
@@ -174,7 +192,7 @@ def _parse_config(raw: dict[str, Any]) -> Config:
         comfy_error_backoff_max_seconds=float(app_raw.get("comfy_error_backoff_max_seconds", 300.0)),
     )
 
-    if not comfy.workflow_file.exists():
+    if comfy.trigger_mode == "api" and not comfy.workflow_file.exists():
         raise ConfigError(f"ComfyUI workflow file not found: {comfy.workflow_file}")
 
     return Config(camera=camera, folders=folders, comfyui=comfy, obs=obs, cleanup=cleanup, app=app)

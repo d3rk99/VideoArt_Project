@@ -28,6 +28,7 @@ VideoArt_Project/
         ├── models.py
         ├── camera.py
         ├── comfy_client.py
+        ├── comfy_browser_trigger.py
         ├── obs_client.py
         ├── output_watcher.py
         ├── cleanup.py
@@ -89,6 +90,17 @@ Set in `comfyui.workflow_file`.
 
 - Must point to your existing ComfyUI API prompt/workflow JSON file.
 - The app **does not** redesign your workflow.
+
+### ComfyUI trigger mode
+Set in `comfyui.trigger_mode`:
+
+- `api` (default): queues `/prompt` directly using workflow JSON.
+- `browser_ui` (experimental): opens a visible ComfyUI page via Playwright and triggers queue from the editor UI (Ctrl+Enter).
+
+`browser_ui` notes:
+- Requires the correct workflow to already be loaded in the visible ComfyUI editor tab.
+- Designed for debug/demo use and is more fragile than API mode.
+- Uses Ctrl+Enter first, with a minimal Queue/Run button-click fallback.
 
 ### 2) ComfyUI input/output folders
 Set in `folders.capture_input_dir` and `folders.comfy_output_dir`.
@@ -159,6 +171,18 @@ This project uses **per-run file manifests** (stored in memory via `RunContext`)
 
 - `q`: quit app (`app.quit_key`)
 - `c`: manual capture override (`app.manual_override_key`)
+
+## Browser UI Trigger (Experimental)
+
+- Enable with:
+  - `comfyui.trigger_mode: "browser_ui"`
+  - `comfyui.browser_url` set to your ComfyUI page
+- Runtime behavior:
+  1) Open visible browser window to ComfyUI.
+  2) Bring page to front and focus.
+  3) Send `Ctrl+Enter` to queue current workflow.
+  4) If shortcut trigger fails, try Queue/Run button fallback selectors.
+- Important: in this mode, the app does **not** call `/prompt` directly.
 
 ## Notes for Production Reliability
 

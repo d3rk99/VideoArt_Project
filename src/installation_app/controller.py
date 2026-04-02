@@ -8,6 +8,7 @@ import cv2
 
 from installation_app.camera import FaceDetector, FaceStatus, WebcamManager
 from installation_app.cleanup import CleanupManager
+from installation_app.comfy_browser_trigger import ComfyUIBrowserTrigger
 from installation_app.comfy_client import ComfyUIClient
 from installation_app.config import Config
 from installation_app.models import AppState, RunContext, build_run_id
@@ -24,6 +25,11 @@ class PipelineController:
         self.webcam = WebcamManager(config.camera)
         self.detector = FaceDetector(config.camera)
         self.comfy = ComfyUIClient(config.comfyui)
+        self.comfy_browser = (
+            ComfyUIBrowserTrigger(config.comfyui, logger)
+            if config.comfyui.trigger_mode == "browser_ui"
+            else None
+        )
         self.obs = OBSClient(config.obs)
         self.cleanup = CleanupManager(config.cleanup, logger)
         self.output_watcher = OutputWatcher(config.folders.comfy_output_dir)
@@ -110,6 +116,9 @@ class PipelineController:
 
         self.comfy.health_check()
         self.logger.info("ComfyUI connectivity check passed")
+        if self.comfy_browser:
+            self.comfy_browser.initialize()
+            self.logger.info("ComfyUI browser_ui trigger initialized")
 
         if self.config.obs.enabled:
             self.obs.connect()
@@ -129,22 +138,29 @@ class PipelineController:
 
             self.state = AppState.TRIGGERING_COMFY
             self._status_message = "Triggering ComfyUI"
-            run.comfy_prompt_id = self.comfy.queue_prompt(client_id=str(uuid.uuid4()))
-            self.logger.info("Queued ComfyUI prompt_id=%s", run.comfy_prompt_id)
+            if self.config.comfyui.trigger_mode == "api":
+                run.comfy_prompt_id = self.comfy.queue_prompt(client_id=str(uuid.uuid4()))
+                self.logger.info("Queued ComfyUI prompt_id=%s", run.comfy_prompt_id)
 
-            self.state = AppState.WAITING_FOR_COMFY
-            self._status_message = "Generating images"
-            _ = self.comfy.wait_for_completion(run.comfy_prompt_id)
-            self.logger.info("ComfyUI run complete prompt_id=%s", run.comfy_prompt_id)
+                self.state = AppState.WAITING_FOR_COMFY
+                self._status_message = "Generating images"
+                _ = self.comfy.wait_for_completion(run.comfy_prompt_id)
+                self.logger.info("ComfyUI run complete prompt_id=%s", run.comfy_prompt_id)
 
-            if self.config.cleanup.cleanup_input_after_comfy:
-                self.state = AppState.CLEANING_INPUTS
-                self._status_message = "Cleaning input files"
-                self.cleanup.delete_files(
-                    run.input_files,
-                    delay_ms=self.config.cleanup.input_cleanup_delay_ms,
-                    label="input",
-                )
+                if self.config.cleanup.cleanup_input_after_comfy:
+                    self.state = AppState.CLEANING_INPUTS
+                    self._status_message = "Cleaning input files"
+                    self.cleanup.delete_files(
+                        run.input_files,
+                        delay_ms=self.config.cleanup.input_cleanup_delay_ms,
+                        label="input",
+                    )
+            else:
+                if not self.comfy_browser:
+                    raise RuntimeError("browser_ui trigger_mode selected but browser trigger is not initialized")
+                self.comfy_browser.queue_current_workflow()
+                self.state = AppState.WAITING_FOR_COMFY
+                self._status_message = "Generating images"
 
             self.state = AppState.COLLECTING_OUTPUTS
             self._status_message = "Collecting output files"
@@ -154,6 +170,15 @@ class PipelineController:
                 poll_interval_seconds=self.config.comfyui.poll_interval_seconds,
             )
             self.logger.info("Detected output files: %s", [str(p) for p in run.output_files])
+
+            if self.config.comfyui.trigger_mode == "browser_ui" and self.config.cleanup.cleanup_input_after_comfy:
+                self.state = AppState.CLEANING_INPUTS
+                self._status_message = "Cleaning input files"
+                self.cleanup.delete_files(
+                    run.input_files,
+                    delay_ms=self.config.cleanup.input_cleanup_delay_ms,
+                    label="input",
+                )
 
             if self.config.obs.enabled:
                 self.state = AppState.UPDATING_OBS
@@ -207,7 +232,11 @@ class PipelineController:
 
     def _register_pipeline_failure(self, exc: Exception) -> None:
         message = str(exc)
-        if "ComfyUI /prompt failed" in message or "ComfyUI run timed out" in message:
+        if (
+            "ComfyUI /prompt failed" in message
+            or "ComfyUI run timed out" in message
+            or "ComfyUI browser trigger failed" in message
+        ):
             self._comfy_failure_count += 1
             base = self.config.app.comfy_error_backoff_seconds
             max_backoff = self.config.app.comfy_error_backoff_max_seconds
@@ -233,6 +262,8 @@ class PipelineController:
     def shutdown(self) -> None:
         self.webcam.close()
         self.comfy.shutdown()
+        if self.comfy_browser:
+            self.comfy_browser.shutdown()
         if self.config.obs.enabled:
             self.obs.disconnect()
         cv2.destroyAllWindows()

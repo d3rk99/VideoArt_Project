@@ -16,6 +16,9 @@ if errorlevel 1 goto :error
 pip install -r requirements.txt
 if errorlevel 1 goto :error
 
+python -m playwright install chromium
+if errorlevel 1 goto :error
+
 echo.
 echo Installation complete.
 echo Copy config.example.yaml to config.yaml and edit for your environment.
