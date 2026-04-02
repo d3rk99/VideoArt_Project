@@ -174,4 +174,5 @@ This project uses **per-run file manifests** (stored in memory via `RunContext`)
 
 - Transient camera read errors are retried and no longer crash the full app loop.
 - If enabled, camera reconnect is attempted automatically on read failures.
+- On reconnect, the app advances to the next backend candidate (on Windows: `dshow` → `msmf` → `auto`) to recover from backend-specific failures.
 - If you see backend-specific OpenCV warnings, switch `camera.backend` between `dshow` and `msmf`.

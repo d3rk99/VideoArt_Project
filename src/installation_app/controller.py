@@ -43,8 +43,11 @@ class PipelineController:
                     self._status_message = "Camera read failed; retrying"
                     if self.config.camera.reconnect_on_read_failure:
                         try:
-                            self.webcam.reopen()
-                            self.logger.info("Camera reopened after read failure")
+                            self.webcam.reopen(advance_backend=True)
+                            self.logger.info(
+                                "Camera reopened after read failure using backend %s",
+                                self.webcam.current_backend_name(),
+                            )
                         except Exception as reopen_exc:  # pylint: disable=broad-except
                             self.logger.error("Camera reopen failed: %s", reopen_exc)
                     time.sleep(self.config.app.idle_reset_seconds)
@@ -86,7 +89,11 @@ class PipelineController:
         self.logger.info("Detected cameras: %s", available)
 
         self.webcam.open()
-        self.logger.info("Opened camera index %s", self.config.camera.primary_index)
+        self.logger.info(
+            "Opened camera index %s with backend %s",
+            self.config.camera.primary_index,
+            self.webcam.current_backend_name(),
+        )
 
         self.comfy.health_check()
         self.logger.info("ComfyUI connectivity check passed")

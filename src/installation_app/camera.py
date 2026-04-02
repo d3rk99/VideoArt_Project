@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from typing import Any
+import platform
 
 import cv2
 import numpy as np
@@ -21,14 +22,38 @@ class WebcamManager:
     def __init__(self, config: CameraConfig) -> None:
         self.config = config
         self.cap: cv2.VideoCapture | None = None
+        self._backend_candidates = self._build_backend_candidates()
+        self._backend_index = 0
 
     def _resolve_backend(self) -> int:
+        return self._backend_candidates[self._backend_index]
+
+    def _build_backend_candidates(self) -> list[int]:
         backend = self.config.backend.lower()
+        windows = platform.system().lower().startswith("win")
+
         if backend == "dshow" and hasattr(cv2, "CAP_DSHOW"):
-            return cv2.CAP_DSHOW
+            return [cv2.CAP_DSHOW]
         if backend == "msmf" and hasattr(cv2, "CAP_MSMF"):
-            return cv2.CAP_MSMF
-        return cv2.CAP_ANY
+            return [cv2.CAP_MSMF]
+        if windows:
+            candidates: list[int] = []
+            if hasattr(cv2, "CAP_DSHOW"):
+                candidates.append(cv2.CAP_DSHOW)
+            if hasattr(cv2, "CAP_MSMF"):
+                candidates.append(cv2.CAP_MSMF)
+            candidates.append(cv2.CAP_ANY)
+            return candidates
+        return [cv2.CAP_ANY]
+
+    @staticmethod
+    def _backend_name(backend: int) -> str:
+        mapping = {
+            getattr(cv2, "CAP_DSHOW", -1): "dshow",
+            getattr(cv2, "CAP_MSMF", -1): "msmf",
+            cv2.CAP_ANY: "auto",
+        }
+        return mapping.get(backend, f"id:{backend}")
 
     def scan_available_cameras(self) -> list[int]:
         available: list[int] = []
@@ -42,11 +67,21 @@ class WebcamManager:
         return available
 
     def open(self) -> None:
-        self.cap = cv2.VideoCapture(self.config.primary_index, self._resolve_backend())
-        if self.cap is None or not self.cap.isOpened():
-            raise RuntimeError(f"Unable to open camera index {self.config.primary_index}")
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.config.frame_width)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.config.frame_height)
+        open_errors: list[str] = []
+        for idx, backend in enumerate(self._backend_candidates):
+            self._backend_index = idx
+            self.cap = cv2.VideoCapture(self.config.primary_index, backend)
+            if self.cap is not None and self.cap.isOpened():
+                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.config.frame_width)
+                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.config.frame_height)
+                return
+            open_errors.append(self._backend_name(backend))
+            if self.cap:
+                self.cap.release()
+                self.cap = None
+        raise RuntimeError(
+            f"Unable to open camera index {self.config.primary_index}. Tried backends: {open_errors}"
+        )
 
     def read(self) -> np.ndarray:
         if not self.cap:
@@ -58,9 +93,14 @@ class WebcamManager:
             time.sleep(self.config.read_retry_delay_ms / 1000)
         raise RuntimeError("Failed to read frame from camera")
 
-    def reopen(self) -> None:
+    def reopen(self, advance_backend: bool = False) -> None:
         self.close()
+        if advance_backend and len(self._backend_candidates) > 1:
+            self._backend_index = (self._backend_index + 1) % len(self._backend_candidates)
         self.open()
+
+    def current_backend_name(self) -> str:
+        return self._backend_name(self._resolve_backend())
 
     def close(self) -> None:
         if self.cap:
