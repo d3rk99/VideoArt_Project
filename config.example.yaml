@@ -43,15 +43,17 @@ obs:
   host: "127.0.0.1"
   port: 4455
   password: "REPLACE_ME"
-  target_scene: "MainScene"
+  staging_scene: "Art_Staging"
+  target_scene: "Art_Staging"
   transition_name: "Fade"
-  transition_duration_ms: 400
+  transition_duration_ms: 300
+  post_transition_delay_ms: 1000
   image_sources:
-    - "GeneratedImageA"
-    - "GeneratedImageB"
-    - "GeneratedImageC"
-    - "GeneratedImageD"
-    - "GeneratedImageE"
+    - "art_slot_1"
+    - "art_slot_2"
+    - "art_slot_3"
+    - "art_slot_4"
+    - "art_slot_5"
 
 cleanup:
   cleanup_input_after_comfy: true

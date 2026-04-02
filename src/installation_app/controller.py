@@ -171,6 +171,12 @@ class PipelineController:
             )
             self.logger.info("Detected output files: %s", [str(p) for p in run.output_files])
 
+            if self.config.obs.enabled and len(run.output_files) < len(self.config.obs.image_sources):
+                raise RuntimeError(
+                    "Not enough generated output files for OBS slots: "
+                    f"needed={len(self.config.obs.image_sources)} got={len(run.output_files)}"
+                )
+
             if self.config.comfyui.trigger_mode == "browser_ui" and self.config.cleanup.cleanup_input_after_comfy:
                 self.state = AppState.CLEANING_INPUTS
                 self._status_message = "Cleaning input files"
@@ -183,11 +189,26 @@ class PipelineController:
             if self.config.obs.enabled:
                 self.state = AppState.UPDATING_OBS
                 self._status_message = "Updating OBS sources"
-                self.obs.update_image_sources(run.output_files)
+                assignments = self.obs.update_image_sources(run.output_files[: len(self.config.obs.image_sources)])
+                self.logger.info(
+                    "OBS source assignments: %s",
+                    [f"{source}<-{path}" for source, path in assignments],
+                )
+                if len(assignments) != len(self.config.obs.image_sources):
+                    raise RuntimeError(
+                        f"Failed to assign all OBS sources: expected={len(self.config.obs.image_sources)} got={len(assignments)}"
+                    )
+                self.obs.set_preview_scene(self.config.obs.staging_scene)
+                self.logger.info("Set preview scene to %s", self.config.obs.staging_scene)
 
                 self.state = AppState.TRIGGERING_TRANSITION
                 self._status_message = "Triggering transition"
                 self.obs.trigger_transition()
+                self.logger.info("Triggered OBS transition: %s", self.config.obs.transition_name)
+                transition_wait = (
+                    self.config.obs.transition_duration_ms + self.config.obs.post_transition_delay_ms
+                ) / 1000
+                time.sleep(transition_wait)
 
             if self.config.cleanup.cleanup_output_after_obs:
                 self.state = AppState.CLEANING_OUTPUTS

@@ -119,7 +119,14 @@ Set in `obs.image_sources`.
 
 - Must match existing OBS image source names exactly.
 - If multiple sources are configured but fewer images are generated, the last image is reused.
-- Example config includes five sources (`GeneratedImageA` ... `GeneratedImageE`) for A-E output layouts.
+- Required staging architecture:
+  - `obs.staging_scene: "Art_Staging"`
+  - 5 image sources in that scene:
+    - `art_slot_1`
+    - `art_slot_2`
+    - `art_slot_3`
+    - `art_slot_4`
+    - `art_slot_5`
 
 ### 4) Camera device index
 Set in `camera.primary_index`.
@@ -187,6 +194,19 @@ This project uses **per-run file manifests** (stored in memory via `RunContext`)
   3) Send `Ctrl+Enter` to queue current workflow.
   4) If shortcut trigger fails, try Queue/Run button fallback selectors.
 - Important: in this mode, the app does **not** call `/prompt` directly.
+
+## OBS Staging Transition Sequence
+
+To avoid exposing new images on Program too early, the app uses this sequence:
+
+1. Update all 5 image sources in the dedicated staging scene (`obs.staging_scene`).
+2. Verify all 5 source slots were assigned.
+3. Set staging scene to **Preview**.
+4. Trigger configured transition (Preview → Program).
+5. Wait `transition_duration_ms + post_transition_delay_ms`.
+6. Delete generated output files.
+
+This ensures cleanup only happens after transition completion/safety delay.
 
 ## Notes for Production Reliability
 

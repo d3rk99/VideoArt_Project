@@ -57,9 +57,11 @@ class OBSConfig:
     host: str
     port: int
     password: str
+    staging_scene: str
     target_scene: str
     transition_name: str
     transition_duration_ms: int
+    post_transition_delay_ms: int
     image_sources: list[str]
 
 
@@ -167,9 +169,11 @@ def _parse_config(raw: dict[str, Any]) -> Config:
         host=str(_require(obs_raw, "host", "obs")),
         port=int(_require(obs_raw, "port", "obs")),
         password=str(obs_raw.get("password", "")),
+        staging_scene=str(obs_raw.get("staging_scene", _require(obs_raw, "target_scene", "obs"))),
         target_scene=str(_require(obs_raw, "target_scene", "obs")),
         transition_name=str(_require(obs_raw, "transition_name", "obs")),
         transition_duration_ms=int(_require(obs_raw, "transition_duration_ms", "obs")),
+        post_transition_delay_ms=int(obs_raw.get("post_transition_delay_ms", 1000)),
         image_sources=[str(v) for v in _require(obs_raw, "image_sources", "obs")],
     )
 
