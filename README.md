@@ -183,6 +183,7 @@ This project uses **per-run file manifests** (stored in memory via `RunContext`)
 
 - `q`: quit app (`app.quit_key`)
 - `c`: manual capture override (`app.manual_override_key`)
+- After each fully successful cycle (Comfy complete → OBS update/transition → cleanup/deferred cleanup), the app waits `app.post_cycle_detection_delay_ms` before resuming face detection (default `1000` ms).
 
 ## Browser UI Trigger (Experimental)
 
