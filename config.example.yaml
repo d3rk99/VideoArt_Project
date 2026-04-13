@@ -1,3 +1,17 @@
+mode:
+  execution_mode: "local" # local | remote_bridge
+
+remote:
+  enabled: false
+  bridge_base_url: "http://10.0.0.2:9000"
+  api_key: ""
+  request_timeout_seconds: 30
+  poll_interval_seconds: 1.0
+
+local_paths:
+  capture_temp_dir: "./data/captures"
+  downloaded_results_dir: "./data/downloaded_results"
+
 camera:
   primary_index: 0
   indices: [0]
@@ -34,7 +48,7 @@ comfyui:
   ui_trigger_delay_ms: 700
   ui_trigger_retry_count: 0
   ui_click_fallback_enabled: false
-  workflow_file: "./workflows/installation_prompt.json"
+  workflow_file: C:\Users\13der\OneDrive\Desktop\GITHUB\VideoArt_Project\AWESOME_Mine_5folders.json
   poll_interval_seconds: 1.0
   completion_timeout_seconds: 180
 
@@ -63,6 +77,14 @@ cleanup:
   cleanup_retry_count: 4
   cleanup_retry_delay_ms: 300
   allow_full_folder_cleanup: false
+
+bridge:
+  host: "0.0.0.0"
+  port: 9000
+  api_key: ""
+  jobs_root_dir: "./data/bridge_jobs"
+  result_ttl_minutes: 30
+  expected_output_count: 5
 
 app:
   debug_logging: false

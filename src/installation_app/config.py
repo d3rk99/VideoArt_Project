@@ -90,6 +90,36 @@ class AppConfig:
 
 
 @dataclass(frozen=True)
+class ModeConfig:
+    execution_mode: str
+
+
+@dataclass(frozen=True)
+class RemoteConfig:
+    enabled: bool
+    bridge_base_url: str
+    api_key: str
+    request_timeout_seconds: float
+    poll_interval_seconds: float
+
+
+@dataclass(frozen=True)
+class LocalPathsConfig:
+    capture_temp_dir: Path
+    downloaded_results_dir: Path
+
+
+@dataclass(frozen=True)
+class BridgeConfig:
+    host: str
+    port: int
+    api_key: str
+    jobs_root_dir: Path
+    result_ttl_minutes: int
+    expected_output_count: int
+
+
+@dataclass(frozen=True)
 class Config:
     camera: CameraConfig
     folders: FolderConfig
@@ -97,6 +127,10 @@ class Config:
     obs: OBSConfig
     cleanup: CleanupConfig
     app: AppConfig
+    mode: ModeConfig
+    remote: RemoteConfig
+    local_paths: LocalPathsConfig
+    bridge: BridgeConfig
 
 
 class ConfigError(ValueError):
@@ -116,6 +150,10 @@ def _parse_config(raw: dict[str, Any]) -> Config:
     obs_raw = _require(raw, "obs", "root")
     cleanup_raw = _require(raw, "cleanup", "root")
     app_raw = _require(raw, "app", "root")
+    mode_raw = raw.get("mode", {})
+    remote_raw = raw.get("remote", {})
+    local_paths_raw = raw.get("local_paths", {})
+    bridge_raw = raw.get("bridge", {})
 
     camera = CameraConfig(
         primary_index=int(_require(camera_raw, "primary_index", "camera")),
@@ -200,10 +238,51 @@ def _parse_config(raw: dict[str, Any]) -> Config:
         comfy_error_backoff_max_seconds=float(app_raw.get("comfy_error_backoff_max_seconds", 300.0)),
     )
 
+    mode = ModeConfig(execution_mode=str(mode_raw.get("execution_mode", "local")).lower())
+    if mode.execution_mode not in {"local", "remote_bridge"}:
+        raise ConfigError("mode.execution_mode must be one of: local, remote_bridge")
+
+    remote = RemoteConfig(
+        enabled=bool(remote_raw.get("enabled", mode.execution_mode == "remote_bridge")),
+        bridge_base_url=str(remote_raw.get("bridge_base_url", "http://127.0.0.1:9000")).rstrip("/"),
+        api_key=str(remote_raw.get("api_key", "")),
+        request_timeout_seconds=float(remote_raw.get("request_timeout_seconds", 30.0)),
+        poll_interval_seconds=float(remote_raw.get("poll_interval_seconds", 1.0)),
+    )
+    if mode.execution_mode == "remote_bridge" and not remote.enabled:
+        raise ConfigError("remote.enabled must be true when mode.execution_mode is remote_bridge")
+
+    local_paths = LocalPathsConfig(
+        capture_temp_dir=Path(local_paths_raw.get("capture_temp_dir", "./data/captures")).expanduser(),
+        downloaded_results_dir=Path(
+            local_paths_raw.get("downloaded_results_dir", "./data/downloaded_results")
+        ).expanduser(),
+    )
+
+    bridge = BridgeConfig(
+        host=str(bridge_raw.get("host", "0.0.0.0")),
+        port=int(bridge_raw.get("port", 9000)),
+        api_key=str(bridge_raw.get("api_key", "")),
+        jobs_root_dir=Path(bridge_raw.get("jobs_root_dir", "./data/bridge_jobs")).expanduser(),
+        result_ttl_minutes=int(bridge_raw.get("result_ttl_minutes", 30)),
+        expected_output_count=int(bridge_raw.get("expected_output_count", 5)),
+    )
+
     if comfy.trigger_mode == "api" and not comfy.workflow_file.exists():
         raise ConfigError(f"ComfyUI workflow file not found: {comfy.workflow_file}")
 
-    return Config(camera=camera, folders=folders, comfyui=comfy, obs=obs, cleanup=cleanup, app=app)
+    return Config(
+        camera=camera,
+        folders=folders,
+        comfyui=comfy,
+        obs=obs,
+        cleanup=cleanup,
+        app=app,
+        mode=mode,
+        remote=remote,
+        local_paths=local_paths,
+        bridge=bridge,
+    )
 
 
 def load_config(config_path: Path) -> Config:
@@ -225,5 +304,8 @@ def load_config(config_path: Path) -> Config:
     config.folders.capture_input_dir.mkdir(parents=True, exist_ok=True)
     config.folders.comfy_output_dir.mkdir(parents=True, exist_ok=True)
     config.folders.archive_dir.mkdir(parents=True, exist_ok=True)
+    config.local_paths.capture_temp_dir.mkdir(parents=True, exist_ok=True)
+    config.local_paths.downloaded_results_dir.mkdir(parents=True, exist_ok=True)
+    config.bridge.jobs_root_dir.mkdir(parents=True, exist_ok=True)
 
     return config

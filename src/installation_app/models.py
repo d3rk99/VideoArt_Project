@@ -30,6 +30,7 @@ class RunContext:
     input_files: list[Path] = field(default_factory=list)
     output_files: list[Path] = field(default_factory=list)
     comfy_prompt_id: str | None = None
+    remote_job_id: str | None = None
 
 
 def build_run_id() -> str:

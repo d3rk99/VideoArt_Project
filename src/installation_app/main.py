@@ -8,6 +8,7 @@ from installation_app.config import ConfigError, load_config
 from installation_app.controller import PipelineController
 from installation_app.logging_utils import setup_logging
 from installation_app.obs_client import OBSClient
+from installation_app.remote_client import RemoteBridgeClient
 
 
 def parse_args() -> argparse.Namespace:
@@ -15,6 +16,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--config", default="config.yaml", help="Path to config YAML file")
     parser.add_argument("--test-comfy", action="store_true", help="Test ComfyUI connection and exit")
     parser.add_argument("--test-obs", action="store_true", help="Test OBS connection and exit")
+    parser.add_argument("--test-remote-bridge", action="store_true", help="Test remote bridge connectivity and exit")
+    parser.add_argument("--run-bridge", action="store_true", help="Run the remote bridge server and exit")
     return parser.parse_args()
 
 
@@ -28,6 +31,24 @@ def main() -> int:
         return 2
 
     logger = setup_logging(config.app.debug_logging)
+
+    if args.run_bridge:
+        from installation_app.bridge.server import run_bridge_server  # Lazy import to avoid FastAPI dependency on laptop-only installs
+
+        run_bridge_server(config, logger)
+        return 0
+
+    if args.test_remote_bridge:
+        if not config.remote.enabled:
+            print("Remote bridge test skipped: remote.enabled is false")
+            return 0
+        client = RemoteBridgeClient(config.remote, config.local_paths, logger)
+        try:
+            client.health_check()
+            print("Remote bridge connectivity test: OK")
+            return 0
+        finally:
+            client.close()
 
     if args.test_comfy:
         client = ComfyUIClient(config.comfyui)

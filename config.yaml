@@ -1,0 +1,76 @@
+camera:
+  primary_index: 0
+  indices: [0]
+  frame_width: 1280
+  frame_height: 720
+  preview_enabled: true
+  scan_max_index: 6
+  face_stability_seconds: 1.5
+  min_face_area_ratio: 0.05
+  capture_cooldown_seconds: 8
+  backend: "dshow" # auto|dshow|msmf ; dshow is usually quieter on Windows
+  read_retry_count: 3
+  read_retry_delay_ms: 120
+  reconnect_on_read_failure: true
+  black_frame_luma_threshold: 8.0
+  black_frame_max_consecutive: 10
+
+folders:
+  # NOTE (Windows YAML): prefer forward slashes like C:/path or single-quoted backslash paths.
+  capture_input_dir: C:\Users\13der\OneDrive\Desktop\Video ART iMAGES\FaceID Inputs
+  # IMPORTANT: most ComfyUI LoadImage nodes expect a specific filename.
+  # Use a fixed filename unless your workflow is explicitly designed for dynamic names.
+  capture_input_filename: "input_face.jpg" # supports {run_id} placeholder if needed
+  comfy_output_dir: C:\Users\13der\OneDrive\Desktop\Video ART iMAGES\Art Outputs\ComfyUI
+  archive_dir: "./data/archive"
+
+comfyui:
+  server_url: "http://127.0.0.1:8188"
+  trigger_mode: "api" # api | browser_ui
+  browser_url: "http://127.0.0.1:8188"
+  playwright_headless: false
+  playwright_browser: "chromium" # chromium | firefox | webkit
+  page_load_timeout_ms: 15000
+  ui_trigger_delay_ms: 700
+  ui_trigger_retry_count: 0
+  ui_click_fallback_enabled: false
+  workflow_file: C:\Users\13der\OneDrive\Desktop\GITHUB\VideoArt_Project\AWESOME_Mine_5folders.json
+  poll_interval_seconds: 1.0
+  completion_timeout_seconds: 180
+
+obs:
+  enabled: true
+  host: "127.0.0.1"
+  port: 4455
+  password: "REPLACE_ME"
+  staging_scene: "Art_Staging"
+  target_scene: "Art_Staging"
+  transition_name: "Fade"
+  transition_duration_ms: 300
+  post_transition_delay_ms: 1000
+  image_sources:
+    - "art_slot_1"
+    - "art_slot_2"
+    - "art_slot_3"
+    - "art_slot_4"
+    - "art_slot_5"
+
+cleanup:
+  cleanup_input_after_comfy: true
+  cleanup_output_after_obs: true
+  input_cleanup_delay_ms: 250
+  output_cleanup_delay_ms: 800
+  cleanup_retry_count: 4
+  cleanup_retry_delay_ms: 300
+  allow_full_folder_cleanup: false
+
+app:
+  debug_logging: false
+  auto_cleanup_old_files: false
+  manual_override_key: "c"
+  quit_key: "q"
+  idle_reset_seconds: 1.0
+  post_cycle_detection_delay_ms: 1000
+  allow_concurrent_jobs: false
+  comfy_error_backoff_seconds: 15.0
+  comfy_error_backoff_max_seconds: 300.0
