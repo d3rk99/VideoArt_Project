@@ -1,7 +1,9 @@
 @echo off
 setlocal
 
-if not exist .venv\Scripts\activate.bat (
+set "VENV_PYTHON=.venv\Scripts\python.exe"
+
+if not exist "%VENV_PYTHON%" (
     echo Virtual environment not found. Run install.bat first.
     pause
     exit /b 1
@@ -13,9 +15,20 @@ if not exist config.yaml (
     exit /b 1
 )
 
-call .venv\Scripts\activate.bat
-set PYTHONPATH=%CD%\src
-python -m installation_app.main --config config.yaml
+echo Verifying Python dependencies...
+"%VENV_PYTHON%" -c "import requests" >nul 2>nul
+if errorlevel 1 (
+    echo Missing dependencies detected. Installing from requirements.txt...
+    "%VENV_PYTHON%" -m pip install -r requirements.txt
+    if errorlevel 1 (
+        echo Failed to install dependencies.
+        pause
+        exit /b 1
+    )
+)
+
+set "PYTHONPATH=%CD%\src"
+"%VENV_PYTHON%" -m installation_app.main --config config.yaml
 set EXIT_CODE=%ERRORLEVEL%
 
 if not "%EXIT_CODE%"=="0" (
