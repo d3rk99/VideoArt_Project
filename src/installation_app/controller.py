@@ -123,8 +123,18 @@ class PipelineController:
         if self._remote_mode:
             if not self.remote_client:
                 raise RuntimeError("Remote execution mode enabled but remote client is not configured")
-            self.remote_client.health_check()
-            self.logger.info("Remote bridge connectivity check passed")
+            try:
+                self.remote_client.health_check()
+                self.logger.info("Remote bridge connectivity check passed")
+            except Exception as exc:  # pylint: disable=broad-except
+                self.logger.warning("Remote bridge health check failed at startup: %s", exc)
+                self._comfy_failure_count = 1
+                backoff_seconds = min(
+                    self.config.app.comfy_error_backoff_seconds,
+                    self.config.app.comfy_error_backoff_max_seconds,
+                )
+                self._comfy_backoff_until = time.monotonic() + max(0.0, backoff_seconds)
+                self._status_message = "Remote bridge unavailable; retrying"
         else:
             if not self.comfy:
                 raise RuntimeError("Local execution mode requires ComfyUI client")
