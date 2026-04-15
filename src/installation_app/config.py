@@ -155,6 +155,10 @@ def _parse_config(raw: dict[str, Any]) -> Config:
     local_paths_raw = raw.get("local_paths", {})
     bridge_raw = raw.get("bridge", {})
 
+    mode = ModeConfig(execution_mode=str(mode_raw.get("execution_mode", "local")).lower())
+    if mode.execution_mode not in {"local", "remote_bridge"}:
+        raise ConfigError("mode.execution_mode must be one of: local, remote_bridge")
+
     camera = CameraConfig(
         primary_index=int(_require(camera_raw, "primary_index", "camera")),
         indices=[int(i) for i in camera_raw.get("indices", [_require(camera_raw, "primary_index", "camera")])],
@@ -184,10 +188,17 @@ def _parse_config(raw: dict[str, Any]) -> Config:
         archive_dir=Path(_require(folders_raw, "archive_dir", "folders")).expanduser(),
     )
 
+    comfy_trigger_mode = str(comfy_raw.get("trigger_mode", "api")).lower()
+    workflow_file_value = comfy_raw.get("workflow_file")
+    if mode.execution_mode == "local" and comfy_trigger_mode == "api":
+        workflow_file_value = _require(comfy_raw, "workflow_file", "comfyui")
+    elif workflow_file_value is None:
+        workflow_file_value = "./workflow.json"
+
     comfy = ComfyUIConfig(
         server_url=str(_require(comfy_raw, "server_url", "comfyui")).rstrip("/"),
-        workflow_file=Path(_require(comfy_raw, "workflow_file", "comfyui")).expanduser(),
-        trigger_mode=str(comfy_raw.get("trigger_mode", "api")).lower(),
+        workflow_file=Path(str(workflow_file_value)).expanduser(),
+        trigger_mode=comfy_trigger_mode,
         browser_url=str(comfy_raw.get("browser_url", _require(comfy_raw, "server_url", "comfyui"))),
         playwright_headless=bool(comfy_raw.get("playwright_headless", False)),
         playwright_browser=str(comfy_raw.get("playwright_browser", "chromium")).lower(),
@@ -238,10 +249,6 @@ def _parse_config(raw: dict[str, Any]) -> Config:
         comfy_error_backoff_max_seconds=float(app_raw.get("comfy_error_backoff_max_seconds", 300.0)),
     )
 
-    mode = ModeConfig(execution_mode=str(mode_raw.get("execution_mode", "local")).lower())
-    if mode.execution_mode not in {"local", "remote_bridge"}:
-        raise ConfigError("mode.execution_mode must be one of: local, remote_bridge")
-
     remote = RemoteConfig(
         enabled=bool(remote_raw.get("enabled", mode.execution_mode == "remote_bridge")),
         bridge_base_url=str(remote_raw.get("bridge_base_url", "http://127.0.0.1:9000")).rstrip("/"),
@@ -268,7 +275,7 @@ def _parse_config(raw: dict[str, Any]) -> Config:
         expected_output_count=int(bridge_raw.get("expected_output_count", 5)),
     )
 
-    if comfy.trigger_mode == "api" and not comfy.workflow_file.exists():
+    if mode.execution_mode == "local" and comfy.trigger_mode == "api" and not comfy.workflow_file.exists():
         raise ConfigError(f"ComfyUI workflow file not found: {comfy.workflow_file}")
 
     return Config(
