@@ -2,18 +2,13 @@
 setlocal
 
 set "PYTHON_BOOTSTRAP_CMD="
+set "VENV_PYTHON=.venv\Scripts\python.exe"
 
-where py >nul 2>nul
-if %ERRORLEVEL%==0 (
-    set "PYTHON_BOOTSTRAP_CMD=py -3.11"
-    goto :python_ready
-)
+call :try_python "py -3.11"
+if defined PYTHON_BOOTSTRAP_CMD goto :python_ready
 
-where python >nul 2>nul
-if %ERRORLEVEL%==0 (
-    set "PYTHON_BOOTSTRAP_CMD=python"
-    goto :python_ready
-)
+call :try_python "python"
+if defined PYTHON_BOOTSTRAP_CMD goto :python_ready
 
 echo Python was not detected. Attempting to install Python 3.11 via winget...
 where winget >nul 2>nul
@@ -26,15 +21,14 @@ if errorlevel 1 (
 winget install --id Python.Python.3.11 --exact --accept-package-agreements --accept-source-agreements --disable-interactivity
 if errorlevel 1 goto :error
 
-where py >nul 2>nul
-if %ERRORLEVEL%==0 (
-    set "PYTHON_BOOTSTRAP_CMD=py -3.11"
-    goto :python_ready
-)
+call :try_python "py -3.11"
+if defined PYTHON_BOOTSTRAP_CMD goto :python_ready
 
-where python >nul 2>nul
-if %ERRORLEVEL%==0 (
-    set "PYTHON_BOOTSTRAP_CMD=python"
+call :try_python "python"
+if defined PYTHON_BOOTSTRAP_CMD goto :python_ready
+
+if exist "%LocalAppData%\Programs\Python\Python311\python.exe" (
+    set "PYTHON_BOOTSTRAP_CMD=""%LocalAppData%\Programs\Python\Python311\python.exe"""
     goto :python_ready
 )
 
@@ -49,16 +43,13 @@ if not exist .venv (
     if errorlevel 1 goto :error
 )
 
-call .venv\Scripts\activate.bat
+"%VENV_PYTHON%" -m pip install --upgrade pip
 if errorlevel 1 goto :error
 
-python -m pip install --upgrade pip
+"%VENV_PYTHON%" -m pip install -r requirements.txt
 if errorlevel 1 goto :error
 
-pip install -r requirements.txt
-if errorlevel 1 goto :error
-
-python -m playwright install chromium
+"%VENV_PYTHON%" -m playwright install chromium
 if errorlevel 1 goto :error
 
 echo.
@@ -74,3 +65,10 @@ echo Press any key to close this window.
 pause
 endlocal
 exit /b 1
+
+:try_python
+%~1 --version >nul 2>nul
+if not errorlevel 1 (
+    set "PYTHON_BOOTSTRAP_CMD=%~1"
+)
+exit /b 0
