@@ -123,8 +123,18 @@ class PipelineController:
         if self._remote_mode:
             if not self.remote_client:
                 raise RuntimeError("Remote execution mode enabled but remote client is not configured")
-            self.remote_client.health_check()
-            self.logger.info("Remote bridge connectivity check passed")
+            try:
+                self.remote_client.health_check()
+                self.logger.info("Remote bridge connectivity check passed")
+            except Exception as exc:  # pylint: disable=broad-except
+                self.logger.warning("Remote bridge health check failed at startup: %s", exc)
+                self._comfy_failure_count = 1
+                backoff_seconds = min(
+                    self.config.app.comfy_error_backoff_seconds,
+                    self.config.app.comfy_error_backoff_max_seconds,
+                )
+                self._comfy_backoff_until = time.monotonic() + max(0.0, backoff_seconds)
+                self._status_message = "Remote bridge unavailable; retrying"
         else:
             if not self.comfy:
                 raise RuntimeError("Local execution mode requires ComfyUI client")
@@ -170,14 +180,6 @@ class PipelineController:
             self._status_message = "Generating images"
             self.comfy.wait_for_completion(run.comfy_prompt_id)
             self.logger.info("ComfyUI run complete prompt_id=%s", run.comfy_prompt_id)
-            if self.config.cleanup.cleanup_input_after_comfy:
-                self.state = AppState.CLEANING_INPUTS
-                self._status_message = "Cleaning input files"
-                self.cleanup.delete_files(
-                    run.input_files,
-                    delay_ms=self.config.cleanup.input_cleanup_delay_ms,
-                    label="input",
-                )
         else:
             if not self.comfy_browser:
                 raise RuntimeError("browser_ui trigger_mode selected but browser trigger is not initialized")
@@ -187,6 +189,11 @@ class PipelineController:
 
         self.state = AppState.COLLECTING_OUTPUTS
         self._status_message = "Collecting output files"
+        self.logger.info(
+            "Waiting for new output files in %s (timeout=%ss)",
+            self.config.folders.comfy_output_dir,
+            self.config.comfyui.completion_timeout_seconds,
+        )
         run.output_files = self.output_watcher.wait_for_new_files(
             baseline=output_baseline,
             timeout_seconds=self.config.comfyui.completion_timeout_seconds,
@@ -194,13 +201,13 @@ class PipelineController:
         )
         self.logger.info("Detected output files: %s", [str(p) for p in run.output_files])
 
-        if self.config.comfyui.trigger_mode == "browser_ui" and self.config.cleanup.cleanup_input_after_comfy:
+        if self.config.cleanup.cleanup_input_after_comfy:
             self.state = AppState.CLEANING_INPUTS
             self._status_message = "Cleaning input files"
             self.cleanup.delete_files(
                 run.input_files,
                 delay_ms=self.config.cleanup.input_cleanup_delay_ms,
-                label="input",
+                label="input_after_output",
             )
 
     def _run_remote_job(self, run: RunContext) -> None:

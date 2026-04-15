@@ -72,8 +72,13 @@ def main() -> int:
         return 0
 
     controller = PipelineController(config, logger)
-    controller.run()
-    return 0
+    try:
+        controller.run()
+        return 0
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.exception("Unhandled runtime error")
+        print(f"Runtime error: {exc}")
+        return 1
 
 
 if __name__ == "__main__":
